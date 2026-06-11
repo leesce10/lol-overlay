@@ -48,14 +48,22 @@ function fallbackSpeak(text) {
 // 서버의 성우급 TTS(mp3) 재생
 function speak(text) {
   if (!text) return;
+  // 이전 브라우저 폴백 음성 중단 (이중 재생 방지)
+  if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+
   const url =
     window.LOLSTATS.API_BASE +
     "/api/live/tts?voice=female&text=" +
     encodeURIComponent(text);
   try {
     if (!ttsAudio) ttsAudio = new Audio();
+    ttsAudio.pause();
+    // 폴백은 진짜 로드 실패(onerror)일 때만 — play() promise의 일시적 reject로는 폴백 안 함
+    ttsAudio.onerror = () => fallbackSpeak(text);
     ttsAudio.src = url;
-    ttsAudio.play().catch(() => fallbackSpeak(text));
+    ttsAudio.play().catch(() => {
+      /* autoplay 등 일시적 거부 무시 */
+    });
   } catch (e) {
     fallbackSpeak(text);
   }
