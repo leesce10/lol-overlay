@@ -112,8 +112,21 @@
         setTimeout(() => el.remove(), 5000);
       }
 
+      function showStatus(s) {
+        let el = document.getElementById("dbg");
+        if (!el) {
+          el = document.createElement("div");
+          el.id = "dbg";
+          el.style.cssText =
+            "position:fixed;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#9f9;font:14px monospace;padding:4px 10px;border-radius:6px;white-space:nowrap;z-index:9";
+          document.body.appendChild(el);
+        }
+        el.textContent = `feat:${s.feat} upd:${s.upd} lcd:${s.lcd} ply:${s.ply} ev:${s.ev} deaths:${s.deaths} me:${s.me}`;
+      }
+
       function handle(id, content) {
         if (id === "new-item" && content) showToast(content);
+        else if (id === "debug-status" && content) showStatus(content);
       }
       if (typeof overwolf !== "undefined") {
         overwolf.windows.onMessageReceived.addListener((msg) =>

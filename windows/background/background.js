@@ -12,6 +12,15 @@ const REQUIRED_FEATURES = ["live_client_data"];
 // 테스트용 가짜 알림 (실서비스에선 false). 실제 동작만 사용.
 const DEBUG_FAKE_CORE_ITEM = false;
 
+// 진단: 화면에 데이터 수신 상태 표시 (문제 해결되면 false)
+const DEBUG_STATUS = true;
+let dbgFeat = "?",
+  dbgUpd = 0,
+  dbgLcd = 0,
+  dbgPly = 0,
+  dbgEv = 0,
+  dbgDeaths = 0;
+
 // 플레이어별 이전 아이템 집합 (summonerName -> Set<itemID>)
 const prevItems = new Map();
 
@@ -109,64 +118,89 @@ overwolf.games.getRunningGameInfo((info) => {
 function registerFeatures() {
   overwolf.games.events.setRequiredFeatures(REQUIRED_FEATURES, (res) => {
     log("setRequiredFeatures:", JSON.stringify(res));
+    dbgFeat = res && res.success ? "ok" : "fail";
   });
 }
 
 // 정보 업데이트(스냅샷) — all_players 아이템 변화 감지 + 게임시작 브리핑
 let activeSummoner = null; // 내 소환사명 (active_player)
 
-overwolf.games.events.onInfoUpdates2.addListener((info) => {
-  if (!info || !info.info || !info.info.live_client_data) return;
-  const lcd = info.info.live_client_data;
-
-  // active_player 로 내 소환사명 확보 (우리팀 판별용)
-  if (lcd.active_player) {
+// 값이 문자열이면 JSON 파싱, 객체면 그대로 (onInfoUpdates2 vs getInfo 둘 다 대응)
+function asObj(v) {
+  if (v == null) return null;
+  if (typeof v === "string") {
     try {
-      const ap = JSON.parse(lcd.active_player);
-      activeSummoner = ap.riotIdGameName || ap.summonerName || activeSummoner;
+      return JSON.parse(v);
     } catch (e) {
-      /* ignore */
+      return null;
     }
   }
+  return v;
+}
 
-  // 게임 시간
-  if (lcd.game_data) {
-    try {
-      const gd = JSON.parse(lcd.game_data);
-      if (typeof gd.gameTime === "number") {
-        latestGameTime = gd.gameTime;
-        maybeFightAnalysis();
-      }
-    } catch (e) {
-      /* ignore */
-    }
+function processLcd(lcd) {
+  if (!lcd) return;
+  dbgLcd++;
+
+  const ap = asObj(lcd.active_player);
+  if (ap) activeSummoner = ap.riotIdGameName || ap.summonerName || activeSummoner;
+
+  const gd = asObj(lcd.game_data);
+  if (gd && typeof gd.gameTime === "number") {
+    latestGameTime = gd.gameTime;
+    maybeFightAnalysis();
   }
 
-  // all_players 는 JSON 문자열로 들어온다.
-  if (lcd.all_players) {
-    let players;
-    try {
-      players = JSON.parse(lcd.all_players);
-    } catch (e) {
-      log("all_players 파싱 실패", e);
-      return;
-    }
+  const players = asObj(lcd.all_players);
+  if (Array.isArray(players)) {
+    dbgPly = players.length;
     latestPlayers = players;
     maybeBriefing(players);
     detectNewItems(players);
-    updateRespawns(players); // 실제 respawnTimer로 복귀 타이머 보정
+    updateRespawns(players);
   }
 
-  // 킬 이벤트 → 적 부활 타이머
-  if (lcd.events) {
-    try {
-      const parsed = JSON.parse(lcd.events);
-      handleKillEvents(parsed.Events || []);
-    } catch (e) {
-      /* ignore */
-    }
+  const ev = asObj(lcd.events);
+  if (ev && Array.isArray(ev.Events)) {
+    dbgEv += ev.Events.length;
+    handleKillEvents(ev.Events);
   }
+}
+
+// 변경 시 델타
+overwolf.games.events.onInfoUpdates2.addListener((info) => {
+  dbgUpd++;
+  if (info && info.info && info.info.live_client_data)
+    processLcd(info.info.live_client_data);
 });
+
+// 현재 전체 상태 폴링 (델타 누락 대비 — 2초마다)
+setInterval(() => {
+  if (!inGame) return;
+  overwolf.games.events.getInfo((res) => {
+    const lcd = res && (res.res || res.info);
+    if (lcd && lcd.live_client_data) processLcd(lcd.live_client_data);
+  });
+}, 2000);
+
+// 진단: 데이터 수신 상태를 아이템 창에 표시 (DEBUG_STATUS true일 때)
+setInterval(() => {
+  if (!DEBUG_STATUS || !overlayId) return;
+  overwolf.windows.sendMessage(
+    overlayId,
+    "debug-status",
+    {
+      feat: dbgFeat,
+      upd: dbgUpd,
+      lcd: dbgLcd,
+      ply: dbgPly,
+      ev: dbgEv,
+      deaths: dbgDeaths,
+      me: activeSummoner || "?",
+    },
+    () => {}
+  );
+}, 2000);
 
 // ---- 적 처치 → 복귀 타이머 ------------------------------------------------
 
@@ -305,7 +339,10 @@ function updateRespawns(players) {
     const justDied = deaths > prev; // 사망 횟수 증가 = 방금 죽음
     const hasTimer = typeof p.respawnTimer === "number" && p.respawnTimer > 0;
 
-    if (justDied) log("적 사망 감지:", name, "deaths", deaths);
+    if (justDied) {
+      dbgDeaths++;
+      log("적 사망 감지:", name, "deaths", deaths);
+    }
 
     // 죽는 순간 1회 발사 + (respawnTimer 있으면) 죽어있는 동안 매 스냅샷 정확 보정
     if (justDied || (hasTimer && p.isDead)) {
