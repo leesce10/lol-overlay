@@ -1,0 +1,39 @@
+{
+  "manifest_version": 1,
+  "type": "WebApp",
+  "meta": {
+    "name": "LoL Overlay (lol-stats)",
+    "version": "0.0.1",
+    "minimum-overwolf-version": "0.200.0",
+    "author": "lol-stats",
+    "icon": "icons/icon.png",
+    "icon_gray": "icons/icon_gray.png",
+    "description": "인게임 아이템 오버레이 - 상대 라이너의 새 아이템을 감지해 화면 위에 표시한다."
+  },
+  "permissions": ["GameInfo"],
+  "data": {
+    "start_window": "background",
+    "windows": {
+      "background": {
+        "file": "windows/background/background.html",
+        "is_background_page": true
+      },
+      "overlay": {
+        "file": "windows/overlay/overlay.html",
+        "transparent": true,
+        "clickthrough": true,
+        "topmost": true,
+        "in_game_only": true,
+        "resizable": false,
+        "show_in_taskbar": false,
+        "size": { "width": 420, "height": 220 },
+        "start_position": { "top": 80, "left": 40 }
+      }
+    },
+    "game_targeting": {
+      "type": "dedicated",
+      "game_ids": [5426]
+    },
+    "game_events": [5426]
+  }
+}
