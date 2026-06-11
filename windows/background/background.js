@@ -42,15 +42,25 @@ function onGameRunning(running) {
     openOverlay();
     registerFeatures();
     if (DEBUG_FAKE_CORE_ITEM) {
-      setTimeout(
-        () =>
-          notifyOverlay({
-            championKey: "Ahri",
-            itemID: 3157,
-            itemName: "존야의 모래시계",
-          }),
-        12000
-      );
+      // 테스트: 12초 후 아이템 + 복귀 + 교전 + TTS 전부 한 번에 띄움
+      setTimeout(() => {
+        notifyOverlay({
+          championKey: "Ahri",
+          itemID: 3157,
+          itemName: "존야의 모래시계",
+        });
+        openTimeline(() => {
+          pushRespawn({ championKey: "Vayne", name: "FAKE", totalSec: 40 });
+          pushFight({
+            key: "baron",
+            objective: "바론",
+            verdict: "매우 유리",
+            reason: "테스트",
+            secondsTo: 50,
+          });
+        });
+        playTts("테스트 음성입니다. 우리팀이 교전에서 유리합니다.");
+      }, 12000);
     }
   } else {
     if (!inGame) return;
@@ -520,7 +530,7 @@ let overlayId = null;
 const OVERLAY_W = 460;
 const OVERLAY_H = 200;
 // 화면 하단에서 토스트 아래 가장자리까지 거리(px). 클수록 더 위로. (스킬창 조금 위)
-const SKILL_CLEARANCE = 180;
+const SKILL_CLEARANCE = 260;
 
 function openOverlay() {
   overwolf.windows.obtainDeclaredWindow("overlay", (res) => {
