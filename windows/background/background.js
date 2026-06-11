@@ -152,6 +152,7 @@ function processLcd(lcd) {
   if (gd && typeof gd.gameTime === "number") {
     latestGameTime = gd.gameTime;
     maybeFightAnalysis();
+    maybeClearGrubs();
   }
 
   const players = asObj(lcd.all_players);
@@ -439,8 +440,9 @@ function updateRespawns(players) {
 
 // ---- 오브젝트 교전 분석 ---------------------------------------------------
 // 스폰 스케줄(초, 추정). 처치 이벤트로 재스폰 계산.
-// 유충은 스폰 패턴이 복잡(다중 스폰)해 오탐이 잦아 제외. 용/바론/전령만.
+// 유충은 처치 이벤트가 없어 6:00 1회만(시간 기반으로 마커 정리). 용만 재스폰.
 const OBJ_SCHEDULE = [
+  { key: "grubs", label: "유충", first: 360, respawn: null }, // 6:00 1회(다중 스폰이라 재스폰 X)
   { key: "herald", label: "전령", first: 840, respawn: null },
   { key: "dragon", label: "드래곤", first: 300, respawn: 300 },
   { key: "baron", label: "바론", first: 1200, respawn: 360 },
@@ -528,6 +530,16 @@ function maybeFightTts(res, obj) {
   const text = buildFightTts(res, stage, obj.label, sec);
   log("교전 TTS:", stage, text);
   playTts(text);
+}
+
+// 유충은 처치 이벤트가 없어 시간 기반으로 마커 정리(스폰 6:00 → ~7:00 제거)
+let grubsCleared = false;
+function maybeClearGrubs() {
+  if (grubsCleared) return;
+  if (latestGameTime >= 420) {
+    grubsCleared = true;
+    if (timelineWinId) pushTimeline("fight-clear", { key: "grubs" });
+  }
 }
 
 // 스폰 60초 전부터, 8초마다 교전 분석 갱신
