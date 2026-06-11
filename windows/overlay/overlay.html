@@ -87,7 +87,12 @@
         `https://ddragon.leagueoflegends.com/cdn/${VER}/img/champion/${k}.png`;
       const toasts = document.getElementById("toasts");
 
-      function showToast({ championKey, itemName, itemID }) {
+      function showToast({ championKey, itemName, itemID, ver }) {
+        const v = ver || VER;
+        const itemUrl = `https://ddragon.leagueoflegends.com/cdn/${v}/img/item/${itemID}.png`;
+        const champUrl = championKey
+          ? `https://ddragon.leagueoflegends.com/cdn/${v}/img/champion/${championKey}.png`
+          : "";
         const el = document.createElement("div");
         el.className = "toast";
         const badge = document.createElement("span");
@@ -95,11 +100,11 @@
         badge.textContent = "적";
         const champImg = document.createElement("img");
         champImg.className = "champ";
-        if (championKey) champImg.src = CHAMP(championKey);
+        if (championKey) champImg.src = champUrl;
         champImg.onerror = () => (champImg.style.display = "none");
         const itemImg = document.createElement("img");
         itemImg.className = "item";
-        itemImg.src = ITEM(itemID);
+        itemImg.src = itemUrl;
         itemImg.onerror = () => (itemImg.style.visibility = "hidden");
         const text = document.createElement("div");
         text.className = "text";

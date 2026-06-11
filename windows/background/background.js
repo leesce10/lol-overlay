@@ -261,9 +261,15 @@ function handleKillEvents(events) {
         const tname = ev.TurretKilled || "";
         const m = tname.match(/Turret_T[12]_([LCR])_/);
         const myLane = myLaneLetter();
-        if (m && myLane && m[1] === myLane) {
+        const laneMatch = !!(m && myLane && m[1] === myLane);
+        log(
+          "타워 파괴:", tname, "| 라인:", m ? m[1] : "?",
+          "| 내라인:", myLane, "| 일치:", laneMatch
+        );
+        // 내 라인 타워 파괴, 또는 내 라인을 모를 때(봇/블라인드 등)는 첫 타워로 종료
+        if (laneMatch || !myLane) {
           lanePhaseOver = true;
-          log("내 라인 타워 파괴 → 라인복귀 UI 종료:", tname);
+          log("→ 라인복귀 UI 종료(lanePhaseOver=true)");
         }
       }
       continue;
@@ -405,7 +411,15 @@ const prevDeaths = new Map();
 function deathCount(p) {
   return (p.scores && (p.scores.deaths ?? p.scores.death)) || 0;
 }
+let loggedMe = false;
 function updateRespawns(players) {
+  if (!loggedMe && activeSummoner) {
+    const me = players.find((p) => sameName(p, activeSummoner));
+    if (me) {
+      loggedMe = true;
+      log("내 정보:", activeSummoner, "| position:", JSON.stringify(me.position), "| team:", me.team);
+    }
+  }
   if (lanePhaseDone()) return; // 라인전 끝나면 복귀 UI 끔
   const mySide = myTeamSide(players);
   for (const p of players) {
@@ -442,11 +456,36 @@ function updateRespawns(players) {
 // 스폰 스케줄(초, 추정). 처치 이벤트로 재스폰 계산.
 // 유충은 처치 이벤트가 없어 6:00 1회만(시간 기반으로 마커 정리). 용만 재스폰.
 const OBJ_SCHEDULE = [
-  { key: "grubs", label: "유충", first: 480, respawn: null }, // 8:00 1회(다중 스폰이라 재스폰 X)
+  // noKillEvent: 처치 이벤트가 안 와서 "살아있음" 추적 불가 → 스폰 직후 잠깐만 노출
+  { key: "grubs", label: "유충", first: 480, respawn: null, noKillEvent: true }, // 8:00
   { key: "herald", label: "전령", first: 960, respawn: null }, // 16:00
   { key: "dragon", label: "드래곤", first: 300, respawn: 300 },
   { key: "baron", label: "바론", first: 1200, respawn: 360 },
 ];
+
+// 오브젝트 그룹/우선순위: 상단(유충<전령<바론)은 한 슬롯 공유 → 높은 것만 표시
+const OBJ_GROUP = {
+  grubs: "up", herald: "up", baron: "up", dragon: "down", elder: "down",
+};
+const OBJ_PRIORITY = { grubs: 1, herald: 2, baron: 3, dragon: 1, elder: 2 };
+
+// 창 안의 오브젝트 중 그룹별 최우선 1개씩만 선택(상단 1 + 하단 1)
+function selectObjectives(upcoming) {
+  const best = {};
+  for (const o of upcoming) {
+    const g = OBJ_GROUP[o.key] || "down";
+    if (!best[g] || (OBJ_PRIORITY[o.key] || 0) > (OBJ_PRIORITY[best[g].key] || 0))
+      best[g] = o;
+  }
+  return Object.values(best);
+}
+
+// 단일 마커 우선순위: 임박(0~30초) > 살아있음 > 멀리 임박(31~60초)
+function objRank(secondsTo) {
+  if (secondsTo > 30) return 2000 + secondsTo; // 멀리 임박: 가장 후순위
+  if (secondsTo > 0) return secondsTo; // 임박: 최우선
+  return 1000 - secondsTo; // 살아있음(음수): 임박 다음
+}
 
 function objectivesInWindow(gameTime, win) {
   const out = [];
@@ -455,12 +494,14 @@ function objectivesInWindow(gameTime, win) {
     let spawnAt;
     if (killed == null) spawnAt = d.first;
     else if (d.respawn != null) spawnAt = killed + d.respawn;
-    else continue;
+    else continue; // 1회성(전령 등)인데 이미 처치됨
     const secondsTo = Math.round(spawnAt - gameTime);
-    if (secondsTo <= win && secondsTo > -20)
-      out.push({ key: d.key, label: d.label, secondsTo });
+    if (secondsTo > win) continue; // 아직 60초보다 멀음
+    // 유충은 처치 이벤트가 없어 스폰 직후 20초까지만, 나머지는 처치 전까지 계속(살아있음)
+    if (d.noKillEvent && secondsTo <= -20) continue;
+    out.push({ key: d.key, label: d.label, secondsTo });
   }
-  return out.sort((a, b) => a.secondsTo - b.secondsTo);
+  return out.sort((a, b) => objRank(a.secondsTo) - objRank(b.secondsTo));
 }
 
 // ---- 오브젝트 교전 TTS ----------------------------------------------------
@@ -542,19 +583,20 @@ function maybeClearGrubs() {
   }
 }
 
-// 스폰 60초 전부터, 8초마다 교전 분석 갱신
+// 스폰 60초 전부터 8초마다(임박 시 3초) 창 안의 모든 오브젝트를 각각 분석·갱신.
+// 살아있는 오브젝트(처치 전)는 계속 창에 남아 마커가 유지된다.
 function maybeFightAnalysis() {
   if (!latestPlayers.length) return;
   const upcoming = objectivesInWindow(latestGameTime, 60);
   if (!upcoming.length) return;
 
   const now = Date.now();
-  // 스폰 임박 시엔 더 촘촘히(소환 직후 TTS를 제때 발사)
-  const soon = upcoming[0].secondsTo <= 12;
+  // 스폰 임박(양수 12초 이내)일 때만 더 촘촘히(소환 직후 TTS를 제때 발사)
+  const s0 = upcoming[0].secondsTo;
+  const soon = s0 > 0 && s0 <= 12;
   if (now - lastFightFetch < (soon ? 3000 : 8000)) return; // 스로틀
   lastFightFetch = now;
 
-  const obj = upcoming[0];
   const mySide = myTeamSide(latestPlayers);
   const myTeamId = mySide === "CHAOS" ? 200 : 100;
   const players = latestPlayers.map((p) => ({
@@ -565,32 +607,35 @@ function maybeFightAnalysis() {
     respawnTimer: p.respawnTimer || 0,
   }));
 
-  fetch(window.LOLSTATS.API_BASE + "/api/live/fight-analysis", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      secondsToObjective: Math.max(0, obj.secondsTo),
-      gameTime: latestGameTime,
-      myTeamId,
-      objective: obj.label,
-      players,
-    }),
-  })
-    .then((r) => r.json())
-    .then((res) => {
-      log("교전 분석:", obj.label, res.verdict);
-      openTimeline(() =>
-        pushFight({
-          key: obj.key,
-          objective: obj.label,
-          verdict: res.verdict,
-          reason: res.reason,
-          secondsTo: obj.secondsTo,
-        })
-      );
-      maybeFightTts(res, obj);
+  // 그룹별 최우선 오브젝트만 분석(상단 슬롯 1 + 하단 슬롯 1) → 독립 마커 유지
+  selectObjectives(upcoming).forEach((obj) => {
+    fetch(window.LOLSTATS.API_BASE + "/api/live/fight-analysis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secondsToObjective: Math.max(0, obj.secondsTo),
+        gameTime: latestGameTime,
+        myTeamId,
+        objective: obj.label,
+        players,
+      }),
     })
-    .catch((e) => log("교전 분석 실패", e));
+      .then((r) => r.json())
+      .then((res) => {
+        log("교전 분석:", obj.label, res.verdict);
+        openTimeline(() =>
+          pushFight({
+            key: obj.key,
+            objective: obj.label,
+            verdict: res.verdict,
+            reason: res.reason,
+            secondsTo: obj.secondsTo,
+          })
+        );
+        maybeFightTts(res, obj);
+      })
+      .catch((e) => log("교전 분석 실패", e));
+  });
 }
 
 // ---- 게임 시작 조합 브리핑 ------------------------------------------------
@@ -716,12 +761,19 @@ function myTeamSide(players) {
 }
 
 // 코어(완성) 아이템 ID 집합 — Data Dragon에서 1회 로드. 하위 구성요소는 제외.
+let DDRAGON_VER = "15.7.1"; // 최신 버전으로 동적 교체(아이콘/코어목록 일치)
 let coreItemIds = null;
 function loadCoreItems() {
   if (coreItemIds) return;
-  fetch(
-    "https://ddragon.leagueoflegends.com/cdn/15.7.1/data/en_US/item.json"
-  )
+  fetch("https://ddragon.leagueoflegends.com/api/versions.json")
+    .then((r) => r.json())
+    .then((vers) => {
+      if (Array.isArray(vers) && vers[0]) DDRAGON_VER = vers[0];
+      log("DDRAGON 버전:", DDRAGON_VER);
+      return fetch(
+        `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VER}/data/en_US/item.json`
+      );
+    })
     .then((r) => r.json())
     .then((j) => {
       const set = new Set();
@@ -773,12 +825,19 @@ function detectNewItems(players) {
       if (!isEnemy) return; // 적만 알림
       const meta = allItems.find((it) => it.itemID === itemID);
       if (meta && meta.consumable) return; // 포션/와드 등 소비템 제외
-      if (!coreItemIds || !coreItemIds.has(itemID)) return; // 코어(완성) 아이템만
+      const core = !!(coreItemIds && coreItemIds.has(itemID));
+      log(
+        "적 새 아이템:", p.championName, "id", itemID,
+        meta ? meta.displayName : "", "| core:", core,
+        "| coreLoaded:", !!coreItemIds, "| overlayId:", overlayId
+      );
+      if (!core) return; // 코어(완성) 아이템만
       notifyOverlay({
         championName: p.championName,
         championKey: championKeyOf(p), // DDragon 아이콘용 (예: "Zed")
         itemID,
         itemName: meta ? meta.displayName : String(itemID),
+        ver: DDRAGON_VER,
       });
     });
   });

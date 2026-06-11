@@ -201,11 +201,20 @@
       };
       const FIGHT_WINDOW = 60;
       const track = document.getElementById("track");
-      // 하단에 오브젝트 슬롯(복귀 아래 한 칸) 들어갈 여유 확보
+      // 오브젝트 그룹: up(맵 상단: 유충/전령/바론) = 아래→위로 올라와 상단 정차
+      //              down(맵 하단: 드래곤) = 위→아래로 내려와 하단 정차
+      const GROUP_OF = {
+        grubs: "up", herald: "up", baron: "up",
+        dragon: "down", elder: "down",
+      };
+      // 적 복귀 이동 구간(양 끝에 오브젝트 정차 자리 확보)
+      const R_TOP = 120; // 적 복귀 시작 y (이 위는 상단 오브젝트 정차용)
+      const rBot = (h) => h - 104; // 적 복귀 도착 y (이 아래는 드래곤 정차용)
       const posFor = (prog, h) =>
-        14 + Math.max(0, Math.min(1, prog)) * (h - 150);
-      // 오브젝트가 소환 완료 후 멈추는 위치(중심): 복귀 도착 위치보다 확실히 아래(겹침 방지)
-      const objBottom = (h) => posFor(1, h) + 90;
+        R_TOP + Math.max(0, Math.min(1, prog)) * (rBot(h) - R_TOP);
+      // 오브젝트 정차 위치(중심)
+      const UP_REST = 48; // 상단 오브젝트: 복귀 시작(120)보다 위
+      const downRest = (h) => rBot(h) + 50; // 드래곤: 복귀 도착보다 아래
 
       const timers = new Map();
       function addRespawn({ championKey, name, totalSec }) {
@@ -236,37 +245,41 @@
         t.endAt = now + totalSec * 1000;
       }
 
-      let fight = null,
-        fEl = null;
-      function ensureFightEl() {
-        if (fEl) return fEl;
-        fEl = document.createElement("div");
-        fEl.className = "f-marker";
-        fEl.innerHTML =
+      // 그룹별 단일 마커. up=유충/전령/바론(서로 덮어씀), down=드래곤
+      const groups = new Map(); // "up"|"down" -> { el, key, spawnAt, dir }
+      function ensureGroupEl(group) {
+        let g = groups.get(group);
+        if (g) return g;
+        const el = document.createElement("div");
+        el.className = "f-marker";
+        el.innerHTML =
           '<img class="fimg" alt="" /><span class="verdict"></span><div class="f-name"></div><div class="f-sec"></div>';
-        track.appendChild(fEl);
-        return fEl;
+        track.appendChild(el);
+        g = { el, dir: group };
+        groups.set(group, g);
+        return g;
       }
       function updateFight({ key, objective, verdict, secondsTo }) {
-        const el = ensureFightEl();
-        const img = el.querySelector(".fimg");
+        const group = GROUP_OF[key] || "down";
+        const g = ensureGroupEl(group);
+        g.key = key; // 이 그룹이 현재 보여주는 오브젝트(새 오브젝트가 덮어씀)
+        const img = g.el.querySelector(".fimg");
         img.src = OBJ_ICON[key] || OBJ_ICON.dragon;
         img.onerror = () => (img.style.visibility = "hidden");
-        const v = el.querySelector(".verdict");
+        const v = g.el.querySelector(".verdict");
         v.textContent = verdict || "";
         v.className = "verdict " + (VCLASS[verdict] || "even");
-        el.querySelector(".f-name").textContent = objective || "";
-        fight = { key, spawnAt: Date.now() + Math.max(0, secondsTo) * 1000 };
-        el.classList.remove("hidden");
+        g.el.querySelector(".f-name").textContent = objective || "";
+        g.spawnAt = Date.now() + Math.max(0, secondsTo) * 1000;
+        g.el.classList.remove("hidden");
       }
       function clearFight(key) {
-        // 해당 오브젝트가 처치됨 → 마커 제거
-        if (fight && key && fight.key !== key) return;
-        if (fEl) {
-          fEl.remove();
-          fEl = null;
-        }
-        fight = null;
+        const group = GROUP_OF[key] || "down";
+        const g = groups.get(group);
+        if (!g) return;
+        if (key && g.key && g.key !== key) return; // 이미 다른 오브젝트가 차지
+        g.el.remove();
+        groups.delete(group);
       }
 
       function render() {
@@ -285,21 +298,23 @@
           t.el.classList.toggle("back", back);
           t.sec.textContent = back ? "복귀" : `${Math.ceil(rem / 1000)}s`;
         }
-        if (fight && fEl) {
-          const ob = objBottom(h);
-          const remMs = fight.spawnAt - now;
-          const fSec = fEl.querySelector(".f-sec");
+        for (const [, g] of groups) {
+          const remMs = g.spawnAt - now;
+          const fSec = g.el.querySelector(".f-sec");
           if (remMs > 0) {
-            // 소환 전: 내려오면서 생성까지 남은 시간 표시
-            const prog = 1 - remMs / (FIGHT_WINDOW * 1000);
-            const center = 14 + Math.max(0, Math.min(1, prog)) * (ob - 14);
-            fEl.style.top = `${center}px`;
+            // 이동 중: 생성까지 남은 시간 표시
+            const p = Math.max(0, Math.min(1, 1 - remMs / (FIGHT_WINDOW * 1000)));
+            const center =
+              g.dir === "up"
+                ? h + p * (UP_REST - h) // 아래(h) → 위(UP_REST)
+                : 14 + p * (downRest(h) - 14); // 위(14) → 아래
+            g.el.style.top = `${center}px`;
             if (fSec) fSec.textContent = `${Math.ceil(remMs / 1000)}s`;
-            fEl.classList.remove("spawned");
+            g.el.classList.remove("spawned");
           } else {
-            // 소환 완료: 맨 하단(복귀 아래 한 칸)에 고정, 처치될 때까지 유지
-            fEl.style.top = `${ob}px`;
-            fEl.classList.add("spawned");
+            // 소환 완료: 정차 위치 고정, 처치 전까지 유지
+            g.el.style.top = `${g.dir === "up" ? UP_REST : downRest(h)}px`;
+            g.el.classList.add("spawned");
           }
         }
         requestAnimationFrame(render);
@@ -333,6 +348,12 @@
             objective: "바론",
             verdict: "매우 유리",
             secondsTo: 50,
+          });
+          updateFight({
+            key: "dragon",
+            objective: "드래곤",
+            verdict: "불리",
+            secondsTo: 40,
           });
         }
       }
