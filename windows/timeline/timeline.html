@@ -274,7 +274,7 @@
         const h = track.clientHeight || 600;
         for (const [id, t] of timers) {
           const rem = t.endAt - now;
-          if (rem <= -1000) {
+          if (rem <= -2500) {
             t.el.remove();
             timers.delete(id);
             continue;
