@@ -12,8 +12,8 @@ const REQUIRED_FEATURES = ["live_client_data"];
 // 테스트용 가짜 알림 (실서비스에선 false). 실제 동작만 사용.
 const DEBUG_FAKE_CORE_ITEM = false;
 
-// 진단: 화면에 데이터 수신 상태 표시 (문제 해결되면 false)
-const DEBUG_STATUS = true;
+// 진단: 화면에 데이터 수신 상태 표시 (문제 해결돼서 끔)
+const DEBUG_STATUS = false;
 let dbgFeat = "?",
   dbgUpd = 0,
   dbgLcd = 0,
@@ -282,8 +282,9 @@ let timelineWinId = null;
 
 // 분수대 → 라인 걸어오는 추정 시간(초). 라인마다 거리가 달라 다르게 잡음.
 function travelFor(position) {
-  const t = { MIDDLE: 11, JUNGLE: 13, TOP: 17, BOTTOM: 17, UTILITY: 16 };
-  return t[(position || "").toUpperCase()] || 15;
+  // 분수대→라인 도착 시간(초). 초반엔 군화 없어 오래 걸림 → 넉넉히.
+  const t = { MIDDLE: 20, JUNGLE: 22, TOP: 28, BOTTOM: 28, UTILITY: 26 };
+  return t[(position || "").toUpperCase()] || 24;
 }
 
 function openTimeline(cb) {
