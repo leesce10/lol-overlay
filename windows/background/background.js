@@ -30,6 +30,7 @@ function isLol(info) {
 function onGameRunning(running) {
   if (running) {
     log("LoL 실행 감지 → 오버레이 + 피처 등록");
+    loadCoreItems();
     openOverlay();
     registerFeatures();
   } else {
@@ -331,13 +332,32 @@ function maybeBriefing(players) {
     .then((r) => r.json())
     .then((data) => {
       lastBriefing = data;
-      log("브리핑 수신:", data.briefing && data.briefing.compEdge);
-      openBriefing(() => pushBriefing());
+      const tts = data && data.briefing && data.briefing.tts;
+      log("브리핑:", data.briefing && data.briefing.compEdge, "| TTS:", !!tts);
+      // 창 띄우지 않고 background에서 바로 음성 재생 (autoplay 제약 없음)
+      if (tts) playTts(tts);
+      else briefingSent = false; // 브리핑 못 만들면 다음 스냅샷서 재시도
     })
     .catch((e) => {
       log("브리핑 요청 실패", e);
       briefingSent = false; // 다음 스냅샷에서 재시도
     });
+}
+
+// background(숨은 페이지)에서 TTS 직접 재생 → 창·클릭 불필요
+let briefingAudio = null;
+function playTts(text) {
+  const url =
+    window.LOLSTATS.API_BASE +
+    "/api/live/tts?voice=hyunsu&text=" +
+    encodeURIComponent(text);
+  try {
+    if (!briefingAudio) briefingAudio = new Audio();
+    briefingAudio.src = url;
+    briefingAudio.play().catch((e) => log("TTS 재생 실패:", e && e.message));
+  } catch (e) {
+    log("TTS 오류:", e);
+  }
 }
 
 let briefingWinId = null;
@@ -387,6 +407,38 @@ function myTeamSide(players) {
   return me ? me.team : "ORDER";
 }
 
+// 코어(완성) 아이템 ID 집합 — Data Dragon에서 1회 로드. 하위 구성요소는 제외.
+let coreItemIds = null;
+function loadCoreItems() {
+  if (coreItemIds) return;
+  fetch(
+    "https://ddragon.leagueoflegends.com/cdn/15.7.1/data/en_US/item.json"
+  )
+    .then((r) => r.json())
+    .then((j) => {
+      const set = new Set();
+      for (const [id, it] of Object.entries(j.data)) {
+        const into = it.into || [];
+        const total = (it.gold && it.gold.total) || 0;
+        const purchasable = it.gold && it.gold.purchasable;
+        const tags = it.tags || [];
+        // 완성템(into 없음) + 충분히 비쌈 + 소비/장신구 아님
+        if (
+          purchasable &&
+          into.length === 0 &&
+          total >= 1600 &&
+          !tags.includes("Consumable") &&
+          !tags.includes("Trinket")
+        ) {
+          set.add(Number(id));
+        }
+      }
+      coreItemIds = set;
+      log("코어 아이템 목록 로드:", set.size);
+    })
+    .catch((e) => log("item.json 로드 실패", e));
+}
+
 function detectNewItems(players) {
   if (!Array.isArray(players)) return;
   const mySide = myTeamSide(players);
@@ -404,7 +456,8 @@ function detectNewItems(players) {
       const added = items.filter((id) => !prev.has(id));
       added.forEach((itemID) => {
         const meta = allItems.find((it) => it.itemID === itemID);
-        if (meta && meta.consumable) return; // 포션/와드 등 소비템 제외(노이즈)
+        if (meta && meta.consumable) return; // 포션/와드 등 소비템 제외
+        if (!coreItemIds || !coreItemIds.has(itemID)) return; // 코어(완성) 아이템만
         notifyOverlay({
           championName: p.championName,
           championKey: championKeyOf(p), // DDragon 아이콘용 (예: "Zed")
@@ -421,11 +474,30 @@ function detectNewItems(players) {
 
 let overlayId = null;
 
+const OVERLAY_W = 460;
+const OVERLAY_H = 200;
+
 function openOverlay() {
   overwolf.windows.obtainDeclaredWindow("overlay", (res) => {
     if (!res.success) return log("overlay 창 obtain 실패", res);
     overlayId = res.window.id;
-    overwolf.windows.restore(overlayId, () => log("overlay 표시"));
+    overwolf.windows.restore(overlayId, () => positionOverlay());
+  });
+}
+
+// 게임 해상도 기준 가운데 하단(스킬창 위 ~100px)에 강제 배치 (manifest 캐시 무시)
+function positionOverlay() {
+  overwolf.games.getRunningGameInfo((info) => {
+    if (!info) return;
+    const w = info.logicalWidth || info.width;
+    const h = info.logicalHeight || info.height;
+    if (!w || !h) return;
+    const left = Math.round((w - OVERLAY_W) / 2);
+    // 스킬바(HUD) 위쪽: 창 아래쪽 가장자리가 스킬창 ~100px 위에 오도록
+    const top = Math.round(h - 230 - OVERLAY_H);
+    overwolf.windows.changePosition(overlayId, left, top, () =>
+      log("overlay 위치:", left, top, "(", w, "x", h, ")")
+    );
   });
 }
 
