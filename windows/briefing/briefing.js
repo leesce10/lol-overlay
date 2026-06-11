@@ -53,7 +53,7 @@ function speak(text) {
 
   const url =
     window.LOLSTATS.API_BASE +
-    "/api/live/tts?voice=hyunsu&text=" +
+    "/api/live/tts?voice=female&text=" +
     encodeURIComponent(text);
   try {
     if (!ttsAudio) ttsAudio = new Audio();

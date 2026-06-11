@@ -9,6 +9,10 @@
 const LOL_CLASS_ID = 5426;
 const REQUIRED_FEATURES = ["live_client_data"];
 
+// 테스트용: true면 게임 시작 ~12초 후 가짜 적 코어템 알림 1회 (위치·디자인 즉시 확인용).
+// ⚠️ 지인 배포 전에는 반드시 false 로!
+const DEBUG_FAKE_CORE_ITEM = false;
+
 // 플레이어별 이전 아이템 집합 (summonerName -> Set<itemID>)
 const prevItems = new Map();
 
@@ -33,6 +37,17 @@ function onGameRunning(running) {
     loadCoreItems();
     openOverlay();
     registerFeatures();
+    if (DEBUG_FAKE_CORE_ITEM) {
+      setTimeout(
+        () =>
+          notifyOverlay({
+            championKey: "Ahri",
+            itemID: 3157,
+            itemName: "존야의 모래시계",
+          }),
+        12000
+      );
+    }
   } else {
     log("LoL 종료 → 상태 초기화");
     prevItems.clear();
@@ -349,7 +364,7 @@ let briefingAudio = null;
 function playTts(text) {
   const url =
     window.LOLSTATS.API_BASE +
-    "/api/live/tts?voice=hyunsu&text=" +
+    "/api/live/tts?voice=female&text=" +
     encodeURIComponent(text);
   try {
     if (!briefingAudio) briefingAudio = new Audio();
