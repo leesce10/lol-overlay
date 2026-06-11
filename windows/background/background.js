@@ -278,6 +278,7 @@ function handleKillEvents(events) {
       continue;
     }
     if (!victim.team || victim.team === mySide) continue; // 적만
+    if (!isMyLaneOpponent(victim)) continue; // 내 라인 상대만
     if (lanePhaseDone()) continue; // 라인전 끝나면 복귀 UI 끔
 
     // 부활 시간 + 라인복귀 이동. 곧 all_players의 실제 respawnTimer로 보정됨.
@@ -327,15 +328,27 @@ function travelFor(gameSec, position, boots) {
 const LANE_PHASE_END = 1200; // 20분 — 안전망(정글이거나 타워 이벤트 놓쳤을 때)
 let lanePhaseOver = false; // 내 라인 1차 타워 파괴 시 true
 
-// 내 포지션 → 포탑 이름의 라인 문자 (L=탑, C=미드, R=바텀)
+// 포지션 → 라인 문자 (L=탑, C=미드, R=바텀·서폿). 정글/불명은 null
+function laneLetterOf(pos) {
+  const p = (pos || "").toUpperCase();
+  if (p === "TOP") return "L";
+  if (p === "MIDDLE" || p === "MID") return "C";
+  if (p === "BOTTOM" || p === "UTILITY") return "R";
+  return null;
+}
+
+// 내 라인 문자
 function myLaneLetter() {
   if (!activeSummoner) return null;
   const me = latestPlayers.find((p) => sameName(p, activeSummoner));
-  const pos = (me && me.position ? me.position : "").toUpperCase();
-  if (pos === "TOP") return "L";
-  if (pos === "MIDDLE" || pos === "MID") return "C";
-  if (pos === "BOTTOM" || pos === "UTILITY") return "R";
-  return null; // 정글 등 → 라인 타워 기준 없음, 20분 폴백
+  return laneLetterOf(me && me.position);
+}
+
+// 이 적이 내 라인 상대인지. 내 포지션이 정글/불명이면 전부 표시(폴백)
+function isMyLaneOpponent(enemy) {
+  const mine = myLaneLetter();
+  if (!mine) return true;
+  return laneLetterOf(enemy.position) === mine;
 }
 
 // 라인복귀 UI를 더 보여줄지: 내 라인 타워가 깨졌거나 20분 지났으면 종료
@@ -396,6 +409,7 @@ function updateRespawns(players) {
   const mySide = myTeamSide(players);
   for (const p of players) {
     if (!p.team || p.team === mySide) continue; // 적만
+    if (!isMyLaneOpponent(p)) continue; // 내 라인 상대만
     const name = p.riotId || p.summonerName || p.championName;
     const deaths = deathCount(p);
     const prev = prevDeaths.has(name) ? prevDeaths.get(name) : deaths;
