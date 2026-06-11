@@ -9,9 +9,8 @@
 const LOL_CLASS_ID = 5426;
 const REQUIRED_FEATURES = ["live_client_data"];
 
-// 테스트용: true면 게임 시작 ~12초 후 가짜 아이템+복귀+교전+TTS 한 번에 (확인용).
-// ⚠️ 지인 배포 전에는 반드시 false 로!  (지금은 테스트 위해 켜둠)
-const DEBUG_FAKE_CORE_ITEM = true;
+// 테스트용 가짜 알림 (실서비스에선 false). 실제 동작만 사용.
+const DEBUG_FAKE_CORE_ITEM = false;
 
 // 플레이어별 이전 아이템 집합 (summonerName -> Set<itemID>)
 const prevItems = new Map();
@@ -287,36 +286,29 @@ function pushFight(payload) {
   pushTimeline("fight-update", payload);
 }
 
-// 적 사망 감지 → 복귀 타이머. respawnTimer 있으면 매 스냅샷 정확 보정,
-// 없으면 "살아있음→죽음" 전환 순간 1회 공식 추정(이후 창이 카운트다운).
-const prevDead = new Map();
-let loggedDeadSample = false;
+// 적 사망 감지 → 복귀 타이머.
+// 가장 확실한 신호: scores.deaths(사망 횟수) 증가 = 방금 죽음. (스코어보드 데이터라 항상 들어옴)
+// respawnTimer가 들어오면 매 스냅샷 정확 보정, 아니면 죽는 순간 공식 추정(창이 카운트다운).
+const prevDeaths = new Map();
+function deathCount(p) {
+  return (p.scores && (p.scores.deaths ?? p.scores.death)) || 0;
+}
 function updateRespawns(players) {
   const mySide = myTeamSide(players);
   for (const p of players) {
     if (!p.team || p.team === mySide) continue; // 적만
     const name = p.riotId || p.summonerName || p.championName;
-    const wasDead = prevDead.get(name) || false;
-    prevDead.set(name, !!p.isDead);
-    if (!p.isDead) continue;
+    const deaths = deathCount(p);
+    const prev = prevDeaths.has(name) ? prevDeaths.get(name) : deaths;
+    prevDeaths.set(name, deaths);
 
-    // 진단: 첫 사망 적의 필드 한 번 로그 (respawnTimer 들어오는지 확인용)
-    if (!loggedDeadSample) {
-      loggedDeadSample = true;
-      log(
-        "죽은 적 샘플:",
-        name,
-        "| isDead=",
-        p.isDead,
-        "respawnTimer=",
-        p.respawnTimer,
-        "level=",
-        p.level
-      );
-    }
-
+    const justDied = deaths > prev; // 사망 횟수 증가 = 방금 죽음
     const hasTimer = typeof p.respawnTimer === "number" && p.respawnTimer > 0;
-    if (hasTimer || !wasDead) {
+
+    if (justDied) log("적 사망 감지:", name, "deaths", deaths);
+
+    // 죽는 순간 1회 발사 + (respawnTimer 있으면) 죽어있는 동안 매 스냅샷 정확 보정
+    if (justDied || (hasTimer && p.isDead)) {
       const base = hasTimer
         ? Math.ceil(p.respawnTimer)
         : Math.round(respawnSeconds(p.level, latestGameTime));
