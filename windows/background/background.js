@@ -40,6 +40,7 @@ function onGameRunning(running) {
     log("LoL 실행 감지 → 오버레이 + 피처 등록");
     loadCoreItems();
     openOverlay();
+    openTimeline(); // 미리 열어 리스너 준비 (메시지 유실 방지)
     registerFeatures();
     if (DEBUG_FAKE_CORE_ITEM) {
       // 테스트: 각각 따로 발사 + 단계별 로그 (하나 실패해도 나머지는 동작)
