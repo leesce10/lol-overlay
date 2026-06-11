@@ -123,6 +123,7 @@ overwolf.games.events.onInfoUpdates2.addListener((info) => {
     latestPlayers = players;
     maybeBriefing(players);
     detectNewItems(players);
+    updateRespawns(players); // 실제 respawnTimer로 복귀 타이머 보정
   }
 
   // 킬 이벤트 → 적 부활 타이머
@@ -160,7 +161,6 @@ const OBJ_EVENT = {
   DragonKill: "dragon",
   BaronKill: "baron",
   HeraldKill: "herald",
-  HordeKill: "grubs",
 };
 
 function handleKillEvents(events) {
@@ -190,9 +190,9 @@ function handleKillEvents(events) {
     }
     if (!victim.team || victim.team === mySide) continue; // 적만
 
-    const respawn = respawnSeconds(victim.level, latestGameTime);
-    const totalSec = Math.round(respawn) + 12; // + 라인 복귀 이동(추정)
-    log("적 처치:", victim.championName, "복귀 예상", totalSec, "초");
+    // 즉시 표시용(공식 추정). 곧 all_players의 실제 respawnTimer로 보정됨.
+    const totalSec = Math.round(respawnSeconds(victim.level, latestGameTime));
+    log("적 처치:", victim.championName, "부활 예상", totalSec, "초");
     openRespawn(() =>
       pushRespawn({
         championKey: championKeyOf(victim),
@@ -204,13 +204,36 @@ function handleKillEvents(events) {
 }
 
 let respawnWinId = null;
+const RETURN_TRAVEL = 0; // 실제 부활 시점 그대로 표시 (이동시간 가산 안 함)
 
 function openRespawn(cb) {
+  if (respawnWinId) {
+    cb && cb();
+    return;
+  }
   overwolf.windows.obtainDeclaredWindow("respawn", (res) => {
     if (!res.success) return log("respawn 창 obtain 실패", res);
     respawnWinId = res.window.id;
     overwolf.windows.restore(respawnWinId, () => cb && cb());
   });
+}
+
+// all_players의 실제 respawnTimer로 매 스냅샷 보정 (공식 추정보다 정확)
+function updateRespawns(players) {
+  const mySide = myTeamSide(players);
+  for (const p of players) {
+    if (!p.team || p.team === mySide) continue; // 적만
+    if (p.isDead && p.respawnTimer > 0) {
+      const name = p.riotId || p.summonerName;
+      openRespawn(() =>
+        pushRespawn({
+          championKey: championKeyOf(p),
+          name,
+          totalSec: Math.ceil(p.respawnTimer) + RETURN_TRAVEL,
+        })
+      );
+    }
+  }
 }
 
 function pushRespawn(payload) {
@@ -221,8 +244,8 @@ function pushRespawn(payload) {
 
 // ---- 오브젝트 교전 분석 ---------------------------------------------------
 // 스폰 스케줄(초, 추정). 처치 이벤트로 재스폰 계산.
+// 유충은 스폰 패턴이 복잡(다중 스폰)해 오탐이 잦아 제외. 용/바론/전령만.
 const OBJ_SCHEDULE = [
-  { key: "grubs", label: "유충", first: 360, respawn: null },
   { key: "herald", label: "전령", first: 840, respawn: null },
   { key: "dragon", label: "드래곤", first: 300, respawn: 300 },
   { key: "baron", label: "바론", first: 1200, respawn: 360 },

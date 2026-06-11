@@ -27,11 +27,12 @@ function addTimer({ championKey, name, totalSec }) {
     el.appendChild(img);
     el.appendChild(sec);
     track.appendChild(el);
-    t = { championKey, el, img, sec };
+    t = { championKey, el, img, sec, totalMs: totalSec * 1000 };
     timers.set(id, t);
   }
-  t.totalMs = totalSec * 1000;
-  t.endAt = now + t.totalMs;
+  // 최초 totalMs(하강 스케일)는 유지하고, 남은시간(endAt)만 정확히 보정
+  if (totalSec * 1000 > t.totalMs) t.totalMs = totalSec * 1000;
+  t.endAt = now + totalSec * 1000;
 }
 
 function render() {
