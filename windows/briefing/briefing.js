@@ -159,9 +159,9 @@ if (location.search.includes("demo")) {
   }
   setTimeout(() => run(SAMPLE), 300);
 } else if (typeof overwolf !== "undefined") {
-  // background가 보내는 참가자 명단 수신
+  // background가 이미 분석을 끝낸 "결과"를 보냄 → 재요청 말고 그대로 렌더(+TTS)
   overwolf.windows.onMessageReceived.addListener((msg) => {
-    if (msg.id === "briefing-data" && msg.content) run(msg.content);
+    if (msg.id === "briefing-data" && msg.content) render(msg.content);
   });
   // 창이 떴음을 background에 알려 데이터 요청 (background가 보관 중이면 즉시 전송)
   overwolf.windows.sendMessage &&
