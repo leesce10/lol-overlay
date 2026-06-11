@@ -1,7 +1,8 @@
 <!doctype html>
-<html>
+<html lang="ko">
   <head>
     <meta charset="utf-8" />
+    <title>item alert</title>
     <style>
       html,
       body {
@@ -10,22 +11,126 @@
         height: 100%;
         background: transparent;
         overflow: hidden;
+        font-family: "Pretendard", "Malgun Gothic", sans-serif;
+        -webkit-user-select: none;
       }
-      iframe {
-        border: 0;
-        width: 100%;
+      #toasts {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
         height: 100%;
-        background: transparent;
+        gap: 8px;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      .toast {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 2px 0;
+        color: #eef2ff;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9));
+        animation: in 0.18s ease-out, out 0.4s ease-in 4.6s forwards;
+      }
+      .enemy-badge {
+        flex: 0 0 auto;
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+        background: #c0392b;
+        border-radius: 6px;
+        padding: 3px 7px;
+      }
+      .toast img {
+        width: 36px;
+        height: 36px;
+        max-width: none;
+        border-radius: 6px;
+        flex: 0 0 auto;
+      }
+      .toast img.champ {
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+      }
+      .toast .text {
+        font-size: 13px;
+        line-height: 1.3;
+        text-shadow: 0 1px 3px #000, 0 0 4px #000;
+      }
+      .toast .text b {
+        color: #ffd76a;
+      }
+      @keyframes in {
+        from {
+          transform: translateY(8px);
+          opacity: 0;
+        }
+      }
+      @keyframes out {
+        to {
+          transform: translateY(-8px);
+          opacity: 0;
+        }
       }
     </style>
   </head>
   <body>
-    <!-- UI는 웹(/overlay/item.html)에서 렌더. background 데이터는 postMessage로 전달. -->
-    <iframe
-      id="f"
-      src="https://lol-stats-kr.vercel.app/overlay/item.html"
-      allowtransparency="true"
-    ></iframe>
-    <script src="../shared/iframe-bridge.js"></script>
+    <div id="toasts"></div>
+    <script>
+      const VER = "15.7.1";
+      const ITEM = (id) =>
+        `https://ddragon.leagueoflegends.com/cdn/${VER}/img/item/${id}.png`;
+      const CHAMP = (k) =>
+        `https://ddragon.leagueoflegends.com/cdn/${VER}/img/champion/${k}.png`;
+      const toasts = document.getElementById("toasts");
+
+      function showToast({ championKey, itemName, itemID }) {
+        const el = document.createElement("div");
+        el.className = "toast";
+        const badge = document.createElement("span");
+        badge.className = "enemy-badge";
+        badge.textContent = "적";
+        const champImg = document.createElement("img");
+        champImg.className = "champ";
+        if (championKey) champImg.src = CHAMP(championKey);
+        champImg.onerror = () => (champImg.style.display = "none");
+        const itemImg = document.createElement("img");
+        itemImg.className = "item";
+        itemImg.src = ITEM(itemID);
+        itemImg.onerror = () => (itemImg.style.visibility = "hidden");
+        const text = document.createElement("div");
+        text.className = "text";
+        text.innerHTML = `<b>${itemName}</b> 구매`;
+        el.appendChild(badge);
+        el.appendChild(champImg);
+        el.appendChild(itemImg);
+        el.appendChild(text);
+        toasts.appendChild(el);
+        setTimeout(() => el.remove(), 5000);
+      }
+
+      function handle(id, content) {
+        if (id === "new-item" && content) showToast(content);
+      }
+      if (typeof overwolf !== "undefined") {
+        overwolf.windows.onMessageReceived.addListener((msg) =>
+          handle(msg.id, msg.content)
+        );
+      } else {
+        window.addEventListener("message", (e) => {
+          const d = e.data || {};
+          handle(d.id, d.content);
+        });
+        if (location.search.includes("bg"))
+          document.body.style.background = "#2b2f3a";
+        if (location.search.includes("demo"))
+          showToast({
+            championKey: "Zed",
+            itemName: "존야의 모래시계",
+            itemID: 3157,
+          });
+      }
+    </script>
   </body>
 </html>

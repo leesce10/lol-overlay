@@ -1,7 +1,8 @@
 <!doctype html>
-<html>
+<html lang="ko">
   <head>
     <meta charset="utf-8" />
+    <title>timeline</title>
     <style>
       html,
       body {
@@ -10,21 +11,279 @@
         height: 100%;
         background: transparent;
         overflow: hidden;
+        font-family: "Pretendard", "Malgun Gothic", sans-serif;
+        -webkit-user-select: none;
       }
-      iframe {
-        border: 0;
+      #track {
+        position: relative;
         width: 100%;
         height: 100%;
-        background: transparent;
+      }
+      .rail {
+        position: absolute;
+        left: 60px;
+        top: 14px;
+        bottom: 14px;
+        width: 2px;
+        transform: translateX(-50%);
+        background: linear-gradient(
+          to bottom,
+          rgba(202, 161, 74, 0.12),
+          rgba(202, 161, 74, 0.6),
+          rgba(202, 161, 74, 0.12)
+        );
+      }
+      .node {
+        position: absolute;
+        left: 60px;
+        width: 9px;
+        height: 9px;
+        background: #caa14a;
+        transform: translate(-50%, -50%) rotate(45deg);
+        box-shadow: 0 0 6px rgba(202, 161, 74, 0.6);
+      }
+      .node-top {
+        top: 14px;
+      }
+      .node-bot {
+        top: calc(100% - 14px);
+      }
+      .r-entry {
+        position: absolute;
+        left: 60px;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .r-entry img {
+        width: 44px;
+        height: 44px;
+        max-width: none;
+        border-radius: 50%;
+        border: 2px solid rgba(230, 70, 70, 0.85);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+      }
+      .r-entry.back img {
+        border-color: #4ade80;
+      }
+      .r-entry .sec {
+        margin-top: 3px;
+        min-width: 40px;
+        text-align: center;
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: 700;
+        color: #ffd1d1;
+        background: rgba(10, 12, 18, 0.8);
+        border-radius: 5px;
+        padding: 1px 5px;
+      }
+      .r-entry.back .sec {
+        color: #bbf7d0;
+      }
+      .f-marker {
+        position: absolute;
+        left: 60px;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 48px;
+      }
+      .f-marker.hidden {
+        display: none;
+      }
+      .f-marker img {
+        width: 46px;
+        height: 46px;
+        max-width: none;
+        border-radius: 8px;
+        border: 2px solid #caa14a;
+        background: rgba(10, 12, 18, 0.85);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+      }
+      .f-name {
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #eef2ff;
+        text-shadow: 0 1px 3px #000;
+      }
+      .verdict {
+        position: absolute;
+        left: 54px;
+        top: 23px;
+        transform: translateY(-50%);
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: 800;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid;
+      }
+      .verdict.veryGood {
+        background: rgba(16, 185, 129, 0.85);
+        color: #fff;
+        border-color: #34d399;
+      }
+      .verdict.good {
+        background: rgba(34, 197, 94, 0.8);
+        color: #fff;
+        border-color: #4ade80;
+      }
+      .verdict.even {
+        background: rgba(40, 44, 60, 0.9);
+        color: #e2e8f0;
+        border-color: rgba(255, 255, 255, 0.25);
+      }
+      .verdict.bad {
+        background: rgba(245, 158, 11, 0.85);
+        color: #1a1205;
+        border-color: #fbbf24;
+      }
+      .verdict.veryBad {
+        background: rgba(239, 68, 68, 0.9);
+        color: #fff;
+        border-color: #f87171;
       }
     </style>
   </head>
   <body>
-    <iframe
-      id="f"
-      src="https://lol-stats-kr.vercel.app/overlay/timeline.html"
-      allowtransparency="true"
-    ></iframe>
-    <script src="../shared/iframe-bridge.js"></script>
+    <div id="track">
+      <div class="rail"></div>
+      <span class="node node-top"></span>
+      <span class="node node-bot"></span>
+    </div>
+    <script>
+      const VER = "15.7.1";
+      const CHAMP = (k) =>
+        `https://ddragon.leagueoflegends.com/cdn/${VER}/img/champion/${k}.png`;
+      const OBJ_BASE =
+        "https://raw.communitydragon.org/latest/game/assets/ux/minimap/icons";
+      const OBJ_ICON = {
+        dragon: OBJ_BASE + "/dragon.png",
+        elder: OBJ_BASE + "/dragon_elder.png",
+        baron: OBJ_BASE + "/baron.png",
+        herald: OBJ_BASE + "/riftherald.png",
+        grubs: OBJ_BASE + "/grub.png",
+      };
+      const VCLASS = {
+        "매우 유리": "veryGood",
+        유리: "good",
+        호각: "even",
+        불리: "bad",
+        "매우 불리": "veryBad",
+      };
+      const FIGHT_WINDOW = 60;
+      const track = document.getElementById("track");
+      const posFor = (prog, h) => 14 + Math.max(0, Math.min(1, prog)) * (h - 28);
+
+      const timers = new Map();
+      function addRespawn({ championKey, name, totalSec }) {
+        const id = "r:" + (name || championKey);
+        let t = timers.get(id);
+        const now = Date.now();
+        if (!t) {
+          const el = document.createElement("div");
+          el.className = "r-entry";
+          const img = document.createElement("img");
+          img.src = CHAMP(championKey);
+          img.onerror = () => (img.style.visibility = "hidden");
+          const sec = document.createElement("div");
+          sec.className = "sec";
+          el.appendChild(img);
+          el.appendChild(sec);
+          track.appendChild(el);
+          t = { el, img, sec, totalMs: totalSec * 1000 };
+          timers.set(id, t);
+        }
+        if (totalSec * 1000 > t.totalMs) t.totalMs = totalSec * 1000;
+        t.endAt = now + totalSec * 1000;
+      }
+
+      let fight = null,
+        fHideAt = 0,
+        fEl = null;
+      function ensureFightEl() {
+        if (fEl) return fEl;
+        fEl = document.createElement("div");
+        fEl.className = "f-marker";
+        fEl.innerHTML =
+          '<img class="fimg" alt="" /><span class="verdict"></span><div class="f-name"></div>';
+        track.appendChild(fEl);
+        return fEl;
+      }
+      function updateFight({ key, objective, verdict, secondsTo }) {
+        const el = ensureFightEl();
+        const img = el.querySelector(".fimg");
+        img.src = OBJ_ICON[key] || OBJ_ICON.dragon;
+        img.onerror = () => (img.style.visibility = "hidden");
+        const v = el.querySelector(".verdict");
+        v.textContent = verdict || "";
+        v.className = "verdict " + (VCLASS[verdict] || "even");
+        el.querySelector(".f-name").textContent = objective || "";
+        fight = { spawnAt: Date.now() + Math.max(0, secondsTo) * 1000 };
+        fHideAt = Date.now() + 25000;
+        el.classList.remove("hidden");
+      }
+
+      function render() {
+        const now = Date.now();
+        const h = track.clientHeight || 600;
+        for (const [id, t] of timers) {
+          const rem = t.endAt - now;
+          if (rem <= -1000) {
+            t.el.remove();
+            timers.delete(id);
+            continue;
+          }
+          const back = rem <= 0;
+          const prog = back ? 1 : 1 - rem / t.totalMs;
+          t.el.style.top = `${posFor(prog, h) - 22}px`;
+          t.el.classList.toggle("back", back);
+          t.sec.textContent = back ? "복귀" : `${Math.ceil(rem / 1000)}s`;
+        }
+        if (fight && fEl && !fEl.classList.contains("hidden")) {
+          if (now > fHideAt) fEl.classList.add("hidden");
+          else {
+            const rem = Math.max(0, (fight.spawnAt - now) / 1000);
+            fEl.style.top = `${posFor(1 - rem / FIGHT_WINDOW, h)}px`;
+          }
+        }
+        requestAnimationFrame(render);
+      }
+      requestAnimationFrame(render);
+
+      function handle(id, content) {
+        if (!content) return;
+        if (id === "respawn-add") addRespawn(content);
+        else if (id === "fight-update") updateFight(content);
+      }
+
+      // 네이티브 Overwolf 창: background가 보내는 메시지 직접 수신
+      if (typeof overwolf !== "undefined") {
+        overwolf.windows.onMessageReceived.addListener((msg) =>
+          handle(msg.id, msg.content)
+        );
+      } else {
+        // 브라우저 미리보기
+        window.addEventListener("message", (e) => {
+          const d = e.data || {};
+          handle(d.id, d.content);
+        });
+        if (location.search.includes("bg"))
+          document.body.style.background = "#2b2f3a";
+        if (location.search.includes("demo")) {
+          addRespawn({ championKey: "Vayne", name: "v", totalSec: 36 });
+          updateFight({
+            key: "baron",
+            objective: "바론",
+            verdict: "매우 유리",
+            secondsTo: 50,
+          });
+        }
+      }
+    </script>
   </body>
 </html>
