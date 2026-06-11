@@ -1,0 +1,104 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: "Pretendard", "Malgun Gothic", sans-serif;
+  color: #eef2ff;
+  -webkit-user-select: none;
+}
+
+.panel {
+  margin: 8px;
+  border-radius: 14px;
+  background: rgba(10, 12, 18, 0.9);
+  border: 1px solid rgba(120, 170, 255, 0.35);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 16px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.header .title {
+  font-weight: 700;
+  font-size: 15px;
+}
+.header .edge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.edge.ahead {
+  background: rgba(80, 200, 120, 0.25);
+  color: #9af2b5;
+}
+.edge.behind {
+  background: rgba(230, 90, 90, 0.25);
+  color: #ffb3b3;
+}
+.header button {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #cdd6f4;
+  font-size: 14px;
+  cursor: pointer;
+}
+.header button + button {
+  margin-left: 4px;
+}
+
+.status {
+  padding: 16px;
+  font-size: 13px;
+  color: #aab;
+}
+
+.body {
+  padding: 8px 12px 12px;
+  overflow-y: auto;
+}
+.body h3 {
+  margin: 6px 0 6px;
+  font-size: 13px;
+  color: #ffd76a;
+}
+.body h4 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  color: #9db2ff;
+}
+.body ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.body li {
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin-bottom: 3px;
+}
+.cols {
+  display: flex;
+  gap: 12px;
+}
+.cols > div {
+  flex: 1;
+}
+.lane-note {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #7b86a8;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 6px;
+}

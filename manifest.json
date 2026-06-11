@@ -28,6 +28,17 @@
         "show_in_taskbar": false,
         "size": { "width": 420, "height": 220 },
         "start_position": { "top": 80, "left": 40 }
+      },
+      "briefing": {
+        "file": "windows/briefing/briefing.html",
+        "transparent": true,
+        "clickthrough": false,
+        "topmost": true,
+        "in_game_only": false,
+        "resizable": false,
+        "show_in_taskbar": false,
+        "size": { "width": 380, "height": 460 },
+        "start_position": { "top": 80, "left": 480 }
       }
     },
     "game_targeting": {

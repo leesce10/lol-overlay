@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>briefing</title>
+    <link rel="stylesheet" href="briefing.css" />
+  </head>
+  <body>
+    <div id="panel" class="panel">
+      <div class="header">
+        <span class="title">게임 브리핑</span>
+        <span id="edge" class="edge"></span>
+        <button id="replay" title="다시 듣기">🔊</button>
+        <button id="close" title="닫기">✕</button>
+      </div>
+      <div id="status" class="status">조합 분석 중…</div>
+      <div id="body" class="body" hidden>
+        <section>
+          <h3>게임 플랜</h3>
+          <ul id="plan"></ul>
+        </section>
+        <section class="cols">
+          <div>
+            <h4>우리 강점</h4>
+            <ul id="ourS"></ul>
+          </div>
+          <div>
+            <h4>상대 강점 (주의)</h4>
+            <ul id="theirS"></ul>
+          </div>
+        </section>
+        <div id="laneNote" class="lane-note"></div>
+      </div>
+    </div>
+    <script src="../shared/config.js"></script>
+    <script src="briefing.js"></script>
+  </body>
+</html>

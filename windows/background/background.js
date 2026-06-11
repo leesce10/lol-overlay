@@ -35,6 +35,9 @@ function onGameRunning(running) {
   } else {
     log("LoL 종료 → 상태 초기화");
     prevItems.clear();
+    briefingSent = false;
+    activeSummoner = null;
+    lastBriefing = null;
   }
 }
 
@@ -56,10 +59,22 @@ function registerFeatures() {
   });
 }
 
-// 정보 업데이트(스냅샷) — all_players 아이템 변화 감지
+// 정보 업데이트(스냅샷) — all_players 아이템 변화 감지 + 게임시작 브리핑
+let activeSummoner = null; // 내 소환사명 (active_player)
+
 overwolf.games.events.onInfoUpdates2.addListener((info) => {
   if (!info || !info.info || !info.info.live_client_data) return;
   const lcd = info.info.live_client_data;
+
+  // active_player 로 내 소환사명 확보 (우리팀 판별용)
+  if (lcd.active_player) {
+    try {
+      const ap = JSON.parse(lcd.active_player);
+      activeSummoner = ap.riotIdGameName || ap.summonerName || activeSummoner;
+    } catch (e) {
+      /* ignore */
+    }
+  }
 
   // all_players 는 JSON 문자열로 들어온다.
   if (lcd.all_players) {
@@ -70,9 +85,85 @@ overwolf.games.events.onInfoUpdates2.addListener((info) => {
       log("all_players 파싱 실패", e);
       return;
     }
+    maybeBriefing(players);
     detectNewItems(players);
   }
 });
+
+// ---- 게임 시작 조합 브리핑 ------------------------------------------------
+
+let briefingSent = false;
+let lastBriefing = null;
+
+// rawChampionName "game_character_displayname_Aatrox" → "Aatrox" (Data Dragon 키)
+function championKeyOf(p) {
+  const raw = p.rawChampionName || "";
+  const m = raw.match(/_([A-Za-z]+)$/);
+  if (m) return m[1];
+  return p.championName || undefined;
+}
+
+function buildParticipants(players) {
+  return players.map((p) => ({
+    riotId: p.riotId || p.summonerName,
+    championKey: championKeyOf(p),
+    championName: p.championName,
+    teamId: p.team === "CHAOS" ? 200 : 100, // ORDER=블루=100
+    position: p.position || undefined,
+  }));
+}
+
+function myTeamId(participants) {
+  if (!activeSummoner) return 100;
+  const me = participants.find(
+    (p) => p.riotId && p.riotId.startsWith(activeSummoner)
+  );
+  return me ? me.teamId : 100;
+}
+
+function maybeBriefing(players) {
+  if (briefingSent || !Array.isArray(players) || players.length < 2) return;
+  briefingSent = true;
+
+  const participants = buildParticipants(players);
+  const payload = { myTeamId: myTeamId(participants), participants };
+
+  const url = window.LOLSTATS.API_BASE + window.LOLSTATS.TEAM_ANALYSIS;
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      lastBriefing = data;
+      log("브리핑 수신:", data.briefing && data.briefing.compEdge);
+      openBriefing(() => pushBriefing());
+    })
+    .catch((e) => {
+      log("브리핑 요청 실패", e);
+      briefingSent = false; // 다음 스냅샷에서 재시도
+    });
+}
+
+let briefingWinId = null;
+
+function openBriefing(cb) {
+  overwolf.windows.obtainDeclaredWindow("briefing", (res) => {
+    if (!res.success) return log("briefing 창 obtain 실패", res);
+    briefingWinId = res.window.id;
+    overwolf.windows.restore(briefingWinId, () => cb && cb());
+  });
+}
+
+function pushBriefing() {
+  if (briefingWinId && lastBriefing) {
+    overwolf.windows.sendMessage(briefingWinId, "briefing-data", lastBriefing, () => {});
+  }
+}
+
+// briefing 창이 늦게 떠서 데이터를 놓친 경우 당겨갈 수 있도록 노출
+window.requestBriefing = pushBriefing;
 
 // 이벤트(킬/드래곤 등) — 2차에서 활용. 지금은 로깅만.
 overwolf.games.events.onNewEvents.addListener((e) => {
