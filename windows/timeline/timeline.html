@@ -207,6 +207,8 @@
         grubs: "up", herald: "up", baron: "up",
         dragon: "down", elder: "down",
       };
+      // 상단 그룹 우선순위(높은 게 소환 완료되면 낮은 걸 치움): 유충<전령<바론
+      const PRIORITY = { grubs: 1, herald: 2, baron: 3, dragon: 1, elder: 2 };
       // 적 복귀 이동 구간(양 끝에 오브젝트 정차 자리 확보)
       const R_TOP = 120; // 적 복귀 시작 y (이 위는 상단 오브젝트 정차용)
       const rBot = (h) => h - 104; // 적 복귀 도착 y (이 아래는 드래곤 정차용)
@@ -245,41 +247,37 @@
         t.endAt = now + totalSec * 1000;
       }
 
-      // 그룹별 단일 마커. up=유충/전령/바론(서로 덮어씀), down=드래곤
-      const groups = new Map(); // "up"|"down" -> { el, key, spawnAt, dir }
-      function ensureGroupEl(group) {
-        let g = groups.get(group);
-        if (g) return g;
+      // 오브젝트별 독립 마커. 상단 교체는 "소환 완료" 시점에만 일어남(아래 render 참고)
+      const fights = new Map(); // objKey -> { el, key, dir, spawnAt, spawned }
+      function ensureFightEl(key) {
+        let f = fights.get(key);
+        if (f) return f;
         const el = document.createElement("div");
         el.className = "f-marker";
         el.innerHTML =
           '<img class="fimg" alt="" /><span class="verdict"></span><div class="f-name"></div><div class="f-sec"></div>';
         track.appendChild(el);
-        g = { el, dir: group };
-        groups.set(group, g);
-        return g;
+        f = { el, key, dir: GROUP_OF[key] || "down" };
+        fights.set(key, f);
+        return f;
       }
       function updateFight({ key, objective, verdict, secondsTo }) {
-        const group = GROUP_OF[key] || "down";
-        const g = ensureGroupEl(group);
-        g.key = key; // 이 그룹이 현재 보여주는 오브젝트(새 오브젝트가 덮어씀)
-        const img = g.el.querySelector(".fimg");
+        const f = ensureFightEl(key);
+        const img = f.el.querySelector(".fimg");
         img.src = OBJ_ICON[key] || OBJ_ICON.dragon;
         img.onerror = () => (img.style.visibility = "hidden");
-        const v = g.el.querySelector(".verdict");
+        const v = f.el.querySelector(".verdict");
         v.textContent = verdict || "";
         v.className = "verdict " + (VCLASS[verdict] || "even");
-        g.el.querySelector(".f-name").textContent = objective || "";
-        g.spawnAt = Date.now() + Math.max(0, secondsTo) * 1000;
-        g.el.classList.remove("hidden");
+        f.el.querySelector(".f-name").textContent = objective || "";
+        f.spawnAt = Date.now() + Math.max(0, secondsTo) * 1000;
+        f.el.classList.remove("hidden");
       }
       function clearFight(key) {
-        const group = GROUP_OF[key] || "down";
-        const g = groups.get(group);
-        if (!g) return;
-        if (key && g.key && g.key !== key) return; // 이미 다른 오브젝트가 차지
-        g.el.remove();
-        groups.delete(group);
+        const f = fights.get(key);
+        if (!f) return;
+        f.el.remove();
+        fights.delete(key);
       }
 
       function render() {
@@ -298,23 +296,36 @@
           t.el.classList.toggle("back", back);
           t.sec.textContent = back ? "복귀" : `${Math.ceil(rem / 1000)}s`;
         }
-        for (const [, g] of groups) {
-          const remMs = g.spawnAt - now;
-          const fSec = g.el.querySelector(".f-sec");
+        for (const [, f] of fights) {
+          const remMs = f.spawnAt - now;
+          const fSec = f.el.querySelector(".f-sec");
           if (remMs > 0) {
             // 이동 중: 생성까지 남은 시간 표시
             const p = Math.max(0, Math.min(1, 1 - remMs / (FIGHT_WINDOW * 1000)));
             const center =
-              g.dir === "up"
+              f.dir === "up"
                 ? h + p * (UP_REST - h) // 아래(h) → 위(UP_REST)
                 : 14 + p * (downRest(h) - 14); // 위(14) → 아래
-            g.el.style.top = `${center}px`;
+            f.el.style.top = `${center}px`;
             if (fSec) fSec.textContent = `${Math.ceil(remMs / 1000)}s`;
-            g.el.classList.remove("spawned");
+            f.el.classList.remove("spawned");
+            f.spawned = false;
           } else {
             // 소환 완료: 정차 위치 고정, 처치 전까지 유지
-            g.el.style.top = `${g.dir === "up" ? UP_REST : downRest(h)}px`;
-            g.el.classList.add("spawned");
+            f.el.style.top = `${f.dir === "up" ? UP_REST : downRest(h)}px`;
+            f.el.classList.add("spawned");
+            f.spawned = true;
+          }
+        }
+        // 상단 그룹 교체: 더 높은 우선순위가 "소환 완료"되면 그보다 낮은 상단 마커 제거
+        // (예: 바론이 다 올라와 소환되면 그때 전령 ui가 사라짐)
+        for (const [, f] of fights) {
+          if (f.dir !== "up" || !f.spawned) continue;
+          for (const [k2, f2] of fights) {
+            if (f2 !== f && f2.dir === "up" && PRIORITY[f2.key] < PRIORITY[f.key]) {
+              f2.el.remove();
+              fights.delete(k2);
+            }
           }
         }
         requestAnimationFrame(render);

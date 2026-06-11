@@ -348,7 +348,7 @@ function travelFor(gameSec, position, boots) {
   return t;
 }
 
-const LANE_PHASE_END = 1200; // 20분 — 안전망(정글이거나 타워 이벤트 놓쳤을 때)
+const LANE_PHASE_END = 960; // 16분 — 안전망(정글이거나 타워 이벤트 놓쳤을 때)
 let lanePhaseOver = false; // 내 라인 1차 타워 파괴 시 true
 
 // 포지션 → 라인 문자 (L=탑, C=미드, R=바텀·서폿). 정글/불명은 null
@@ -479,24 +479,7 @@ const OBJ_SCHEDULE = [
   { key: "baron", label: "바론", first: 1200, respawn: 360 },
 ];
 
-// 오브젝트 그룹/우선순위: 상단(유충<전령<바론)은 한 슬롯 공유 → 높은 것만 표시
-const OBJ_GROUP = {
-  grubs: "up", herald: "up", baron: "up", dragon: "down", elder: "down",
-};
-const OBJ_PRIORITY = { grubs: 1, herald: 2, baron: 3, dragon: 1, elder: 2 };
-
-// 창 안의 오브젝트 중 그룹별 최우선 1개씩만 선택(상단 1 + 하단 1)
-function selectObjectives(upcoming) {
-  const best = {};
-  for (const o of upcoming) {
-    const g = OBJ_GROUP[o.key] || "down";
-    if (!best[g] || (OBJ_PRIORITY[o.key] || 0) > (OBJ_PRIORITY[best[g].key] || 0))
-      best[g] = o;
-  }
-  return Object.values(best);
-}
-
-// 단일 마커 우선순위: 임박(0~30초) > 살아있음 > 멀리 임박(31~60초)
+// 표시/분석 우선순위 정렬용: 임박(0~30초) > 살아있음 > 멀리 임박(31~60초)
 function objRank(secondsTo) {
   if (secondsTo > 30) return 2000 + secondsTo; // 멀리 임박: 가장 후순위
   if (secondsTo > 0) return secondsTo; // 임박: 최우선
@@ -623,8 +606,9 @@ function maybeFightAnalysis() {
     respawnTimer: p.respawnTimer || 0,
   }));
 
-  // 그룹별 최우선 오브젝트만 분석(상단 슬롯 1 + 하단 슬롯 1) → 독립 마커 유지
-  selectObjectives(upcoming).forEach((obj) => {
+  // 창 안의 모든 오브젝트를 각각 분석 → 오브젝트별 독립 마커. 상단 교체는
+  // 타임라인이 "소환 완료" 시점에 처리(바론이 다 올라오면 전령 제거).
+  upcoming.forEach((obj) => {
     fetch(window.LOLSTATS.API_BASE + "/api/live/fight-analysis", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
