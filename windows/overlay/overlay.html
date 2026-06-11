@@ -118,10 +118,13 @@
           el = document.createElement("div");
           el.id = "dbg";
           el.style.cssText =
-            "position:fixed;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#9f9;font:14px monospace;padding:4px 10px;border-radius:6px;white-space:nowrap;z-index:9";
+            "position:fixed;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#9f9;font:13px monospace;padding:4px 10px;border-radius:6px;max-width:92vw;text-align:center;line-height:1.5;z-index:9";
           document.body.appendChild(el);
         }
-        el.textContent = `feat:${s.feat} upd:${s.upd} lcd:${s.lcd} ply:${s.ply} ev:${s.ev} deaths:${s.deaths} me:${s.me}`;
+        el.innerHTML =
+          `feat:${s.feat} upd:${s.upd} lcd:${s.lcd} ply:${s.ply} ev:${s.ev} deaths:${s.deaths} me:${s.me}` +
+          `<br>infoKeys:${s.infoKeys}` +
+          `<br>lcdKeys:${s.keys}`;
       }
 
       function handle(id, content) {

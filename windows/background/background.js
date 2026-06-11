@@ -19,7 +19,9 @@ let dbgFeat = "?",
   dbgLcd = 0,
   dbgPly = 0,
   dbgEv = 0,
-  dbgDeaths = 0;
+  dbgDeaths = 0,
+  dbgInfoKeys = "",
+  dbgKeys = "";
 
 // 플레이어별 이전 아이템 집합 (summonerName -> Set<itemID>)
 const prevItems = new Map();
@@ -141,6 +143,7 @@ function asObj(v) {
 function processLcd(lcd) {
   if (!lcd) return;
   dbgLcd++;
+  if (!dbgKeys) dbgKeys = Object.keys(lcd).join(",") || "(empty)";
 
   const ap = asObj(lcd.active_player);
   if (ap) activeSummoner = ap.riotIdGameName || ap.summonerName || activeSummoner;
@@ -170,8 +173,10 @@ function processLcd(lcd) {
 // 변경 시 델타
 overwolf.games.events.onInfoUpdates2.addListener((info) => {
   dbgUpd++;
-  if (info && info.info && info.info.live_client_data)
-    processLcd(info.info.live_client_data);
+  if (info && info.info) {
+    if (!dbgInfoKeys) dbgInfoKeys = Object.keys(info.info).join(",") || "(empty)";
+    if (info.info.live_client_data) processLcd(info.info.live_client_data);
+  }
 });
 
 // 현재 전체 상태 폴링 (델타 누락 대비 — 2초마다)
@@ -197,6 +202,8 @@ setInterval(() => {
       ev: dbgEv,
       deaths: dbgDeaths,
       me: activeSummoner || "?",
+      infoKeys: dbgInfoKeys || "(none)",
+      keys: dbgKeys || "(none)",
     },
     () => {}
   );
