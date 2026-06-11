@@ -55,8 +55,8 @@ function render() {
   if (current && !track.classList.contains("hidden")) {
     const h = track.clientHeight || 460;
     const remain = Math.max(0, (current.spawnAt - Date.now()) / 1000);
-    // 위(스폰 멀었음) → 아래(스폰 임박)
-    const progress = Math.min(1, 1 - remain / WINDOW_SEC);
+    // 위(스폰 멀었음, 상단 노드) → 아래(스폰, 하단 노드)
+    const progress = Math.max(0, Math.min(1, 1 - remain / WINDOW_SEC));
     const top = 14 + progress * (h - 28);
     marker.style.top = `${top}px`;
   }

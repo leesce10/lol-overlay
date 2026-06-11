@@ -60,7 +60,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  transition: top 0.4s linear;
+  /* 위치는 매 프레임(rAF) 직접 갱신 → 트랜지션 없이 부드럽게 하강 */
 }
 .marker .box {
   display: flex;
