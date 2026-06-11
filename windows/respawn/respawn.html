@@ -1,17 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>respawn</title>
-    <link rel="stylesheet" href="respawn.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+      }
+      iframe {
+        border: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+      }
+    </style>
   </head>
   <body>
-    <div id="track">
-      <div class="rail"></div>
-      <span class="node node-top"></span>
-      <span class="node node-bot"></span>
-    </div>
-    <script src="../shared/config.js"></script>
-    <script src="respawn.js"></script>
+    <iframe
+      id="f"
+      src="https://lol-stats-kr.vercel.app/overlay/respawn.html"
+      allowtransparency="true"
+    ></iframe>
+    <script src="../shared/iframe-bridge.js"></script>
   </body>
 </html>

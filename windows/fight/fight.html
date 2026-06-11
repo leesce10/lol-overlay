@@ -1,24 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>fight</title>
-    <link rel="stylesheet" href="fight.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+      }
+      iframe {
+        border: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+      }
+    </style>
   </head>
   <body>
-    <div id="track" class="hidden">
-      <div class="rail"></div>
-      <span class="node node-top"></span>
-      <span class="node node-bot"></span>
-      <!-- 오브젝트 마커: 초상화 + 이름 + 판정 -->
-      <div id="marker" class="marker">
-        <div class="box">
-          <img id="obj-icon" alt="objective" />
-          <span id="verdict" class="verdict"></span>
-        </div>
-        <div id="obj-name" class="obj-name"></div>
-      </div>
-    </div>
-    <script src="fight.js"></script>
+    <iframe
+      id="f"
+      src="https://lol-stats-kr.vercel.app/overlay/fight.html"
+      allowtransparency="true"
+    ></iframe>
+    <script src="../shared/iframe-bridge.js"></script>
   </body>
 </html>
