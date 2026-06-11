@@ -740,29 +740,35 @@ function detectNewItems(players) {
   const mySide = myTeamSide(players);
 
   players.forEach((p) => {
-    const name = p.summonerName || p.riotId || "unknown";
+    const name = p.riotId || p.summonerName || p.championName || "unknown";
     const allItems = p.items || [];
-    const items = allItems.map((it) => it.itemID);
-    const curr = new Set(items);
-    const prev = prevItems.get(name);
+    const ids = allItems.map((it) => it.itemID);
+    // 시야 밖이면 목록이 비거나 줄어듦 → 기록 축소 금지(빈 스냅샷은 무시)
+    if (!ids.length) return;
+
+    const seen = prevItems.get(name); // 지금까지 본 아이템 합집합(절대 축소 안 함)
     const isEnemy = p.team && p.team !== mySide;
 
-    // prev가 있어야(=두 번째 스냅샷부터) 변화로 인정 → 시작 아이템은 알리지 않음
-    if (prev && isEnemy) {
-      const added = items.filter((id) => !prev.has(id));
-      added.forEach((itemID) => {
-        const meta = allItems.find((it) => it.itemID === itemID);
-        if (meta && meta.consumable) return; // 포션/와드 등 소비템 제외
-        if (!coreItemIds || !coreItemIds.has(itemID)) return; // 코어(완성) 아이템만
-        notifyOverlay({
-          championName: p.championName,
-          championKey: championKeyOf(p), // DDragon 아이콘용 (예: "Zed")
-          itemID,
-          itemName: meta ? meta.displayName : String(itemID),
-        });
-      });
+    // 첫 관측: 기존/시작 아이템은 알리지 않고 기록만
+    if (!seen) {
+      prevItems.set(name, new Set(ids));
+      return;
     }
-    prevItems.set(name, curr);
+
+    ids.forEach((itemID) => {
+      if (seen.has(itemID)) return; // 이미 본 아이템(중복 알림 방지)
+      seen.add(itemID); // 봤다고 기록 → 같은 아이템 다신 안 울림
+      if (!isEnemy) return; // 적만 알림
+      const meta = allItems.find((it) => it.itemID === itemID);
+      if (meta && meta.consumable) return; // 포션/와드 등 소비템 제외
+      if (!coreItemIds || !coreItemIds.has(itemID)) return; // 코어(완성) 아이템만
+      notifyOverlay({
+        championName: p.championName,
+        championKey: championKeyOf(p), // DDragon 아이콘용 (예: "Zed")
+        itemID,
+        itemName: meta ? meta.displayName : String(itemID),
+      });
+    });
   });
 }
 
