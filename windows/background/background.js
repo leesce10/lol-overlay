@@ -268,7 +268,7 @@ function handleKillEvents(events) {
     // 부활 시간 + 라인복귀 이동. 곧 all_players의 실제 respawnTimer로 보정됨.
     const totalSec =
       Math.round(respawnSeconds(victim.level, latestGameTime)) +
-      travelFor(latestGameTime, victim.position, hasBoots(victim));
+      travelFor(latestGameTime, victim.position, bootTier(victim));
     log("적 처치:", victim.championName, "복귀", totalSec, "초");
     openTimeline(() =>
       pushRespawn({
@@ -285,20 +285,27 @@ let timelineWinId = null;
 
 // 분수대 → 라인 걸어오는 추정 시간(초). 라인마다 거리가 달라 다르게 잡음.
 // 신발 아이템 ID (있으면 이동 빨라짐)
+const T1_BOOTS = 1001; // 기본 신발(티어1)
 const BOOTS_IDS = new Set([
   1001, 3006, 3009, 3020, 3047, 3111, 3117, 3158,
 ]);
-function hasBoots(p) {
-  return (p.items || []).some((it) => BOOTS_IDS.has(it.itemID));
+// 0=없음, 1=기본 신발, 2=2티어(업그레이드) 신발
+function bootTier(p) {
+  const ids = (p.items || []).map((it) => it.itemID);
+  if (ids.some((id) => BOOTS_IDS.has(id) && id !== T1_BOOTS)) return 2;
+  if (ids.includes(T1_BOOTS)) return 1;
+  return 0;
 }
 
-// 분수대→라인 이동(초). 게임 진행될수록 짧아짐. 탑/바텀/서폿 +5, 신발 있으면 -2.
+// 분수대→라인 이동(초). 게임 진행될수록 짧아짐.
+// 탑/바텀/서폿 +5, 신발 -2, 2티어 신발 추가 -1.
 function travelFor(gameSec, position, boots) {
   const min = (gameSec || 0) / 60;
   let t = min < 8 ? 15 : min < 20 ? 13 : 12;
   const pos = (position || "").toUpperCase();
   if (pos === "TOP" || pos === "BOTTOM" || pos === "UTILITY") t += 5;
-  if (boots) t -= 2;
+  if (boots >= 1) t -= 2;
+  if (boots >= 2) t -= 1;
   return t;
 }
 
@@ -376,7 +383,7 @@ function updateRespawns(players) {
       const respawn = hasTimer
         ? Math.ceil(p.respawnTimer)
         : Math.round(respawnSeconds(p.level, latestGameTime));
-      const totalSec = respawn + travelFor(latestGameTime, p.position, hasBoots(p));
+      const totalSec = respawn + travelFor(latestGameTime, p.position, bootTier(p));
       openTimeline(() =>
         pushRespawn({ championKey: championKeyOf(p), name, totalSec })
       );

@@ -204,8 +204,8 @@
       // 하단에 오브젝트 슬롯(복귀 아래 한 칸) 들어갈 여유 확보
       const posFor = (prog, h) =>
         14 + Math.max(0, Math.min(1, prog)) * (h - 150);
-      // 오브젝트가 소환 완료 후 멈추는 위치(중심): 복귀 도착 위치보다 한 칸 더 아래
-      const objBottom = (h) => posFor(1, h) + 50;
+      // 오브젝트가 소환 완료 후 멈추는 위치(중심): 복귀 도착 위치보다 확실히 아래(겹침 방지)
+      const objBottom = (h) => posFor(1, h) + 90;
 
       const timers = new Map();
       function addRespawn({ championKey, name, totalSec }) {
