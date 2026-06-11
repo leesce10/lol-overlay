@@ -27,8 +27,11 @@ function fill(ulId, items, empty) {
 
 // ---- TTS -----------------------------------------------------------------
 
-function speak(text) {
-  if (!text || typeof speechSynthesis === "undefined") return;
+let ttsAudio = null;
+
+// 브라우저 기본 음성 (성우 TTS 실패 시 폴백)
+function fallbackSpeak(text) {
+  if (typeof speechSynthesis === "undefined") return;
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
@@ -39,6 +42,22 @@ function speak(text) {
     speechSynthesis.speak(u);
   } catch (e) {
     console.warn("TTS 실패", e);
+  }
+}
+
+// 서버의 성우급 TTS(mp3) 재생
+function speak(text) {
+  if (!text) return;
+  const url =
+    window.LOLSTATS.API_BASE +
+    "/api/live/tts?voice=female&text=" +
+    encodeURIComponent(text);
+  try {
+    if (!ttsAudio) ttsAudio = new Audio();
+    ttsAudio.src = url;
+    ttsAudio.play().catch(() => fallbackSpeak(text));
+  } catch (e) {
+    fallbackSpeak(text);
   }
 }
 
