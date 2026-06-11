@@ -190,9 +190,11 @@ function handleKillEvents(events) {
     }
     if (!victim.team || victim.team === mySide) continue; // 적만
 
-    // 즉시 표시용(공식 추정). 곧 all_players의 실제 respawnTimer로 보정됨.
-    const totalSec = Math.round(respawnSeconds(victim.level, latestGameTime));
-    log("적 처치:", victim.championName, "부활 예상", totalSec, "초");
+    // 즉시 표시용(공식 추정 + 라인 이동). 곧 all_players의 실제 respawnTimer로 보정됨.
+    const totalSec =
+      Math.round(respawnSeconds(victim.level, latestGameTime)) +
+      travelFor(victim.position);
+    log("적 처치:", victim.championName, "복귀 예상", totalSec, "초");
     openRespawn(() =>
       pushRespawn({
         championKey: championKeyOf(victim),
@@ -204,7 +206,13 @@ function handleKillEvents(events) {
 }
 
 let respawnWinId = null;
-const RETURN_TRAVEL = 0; // 실제 부활 시점 그대로 표시 (이동시간 가산 안 함)
+
+// 분수대 → 라인 걸어오는 추정 시간(초). 라인마다 거리가 달라 다르게 잡음.
+// (이동속도·군화 등 변수라 추정값 — 필요 시 숫자만 조정)
+function travelFor(position) {
+  const t = { MIDDLE: 11, JUNGLE: 13, TOP: 17, BOTTOM: 17, UTILITY: 16 };
+  return t[(position || "").toUpperCase()] || 15;
+}
 
 function openRespawn(cb) {
   if (respawnWinId) {
@@ -229,7 +237,8 @@ function updateRespawns(players) {
         pushRespawn({
           championKey: championKeyOf(p),
           name,
-          totalSec: Math.ceil(p.respawnTimer) + RETURN_TRAVEL,
+          // 정확한 부활 타이머 + 라인별 걸어오는 시간(추정)
+          totalSec: Math.ceil(p.respawnTimer) + travelFor(p.position),
         })
       );
     }
