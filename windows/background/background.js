@@ -31,8 +31,12 @@ function isLol(info) {
   return classIdFromGameInfo(info) === LOL_CLASS_ID;
 }
 
+let inGame = false; // 게임당 셋업 1회만 (onGameRunning 중복 호출 방지)
+
 function onGameRunning(running) {
   if (running) {
+    if (inGame) return; // 이미 셋업됨 → 중복 실행 방지
+    inGame = true;
     log("LoL 실행 감지 → 오버레이 + 피처 등록");
     loadCoreItems();
     openOverlay();
@@ -49,6 +53,8 @@ function onGameRunning(running) {
       );
     }
   } else {
+    if (!inGame) return;
+    inGame = false;
     log("LoL 종료 → 상태 초기화");
     prevItems.clear();
     briefingSent = false;
@@ -491,6 +497,8 @@ let overlayId = null;
 
 const OVERLAY_W = 460;
 const OVERLAY_H = 200;
+// 화면 하단에서 토스트 아래 가장자리까지 거리(px). 클수록 더 위로. (스킬창 안 겹치게)
+const SKILL_CLEARANCE = 360;
 
 function openOverlay() {
   overwolf.windows.obtainDeclaredWindow("overlay", (res) => {
@@ -508,8 +516,8 @@ function positionOverlay() {
     const h = info.logicalHeight || info.height;
     if (!w || !h) return;
     const left = Math.round((w - OVERLAY_W) / 2);
-    // 스킬바(HUD) 위쪽: 창 아래쪽 가장자리가 스킬창 ~100px 위에 오도록
-    const top = Math.round(h - 230 - OVERLAY_H);
+    // 창 아래쪽 가장자리(= 토스트 위치)가 화면 바닥에서 SKILL_CLEARANCE 만큼 위
+    const top = Math.round(h - SKILL_CLEARANCE - OVERLAY_H);
     overwolf.windows.changePosition(overlayId, left, top, () =>
       log("overlay 위치:", left, top, "(", w, "x", h, ")")
     );
