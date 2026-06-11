@@ -42,24 +42,45 @@ function onGameRunning(running) {
     openOverlay();
     registerFeatures();
     if (DEBUG_FAKE_CORE_ITEM) {
-      // 테스트: 12초 후 아이템 + 복귀 + 교전 + TTS 전부 한 번에 띄움
+      // 테스트: 각각 따로 발사 + 단계별 로그 (하나 실패해도 나머지는 동작)
+      log("DEBUG 모드 ON — 8초 후 아이템, 10초 타임라인, 12초 TTS");
       setTimeout(() => {
-        notifyOverlay({
-          championKey: "Ahri",
-          itemID: 3157,
-          itemName: "존야의 모래시계",
-        });
-        openTimeline(() => {
-          pushRespawn({ championKey: "Vayne", name: "FAKE", totalSec: 40 });
-          pushFight({
-            key: "baron",
-            objective: "바론",
-            verdict: "매우 유리",
-            reason: "테스트",
-            secondsTo: 50,
+        log("DEBUG: 아이템 발사 (overlayId=" + overlayId + ")");
+        try {
+          notifyOverlay({
+            championKey: "Ahri",
+            itemID: 3157,
+            itemName: "존야의 모래시계",
           });
-        });
-        playTts("테스트 음성입니다. 우리팀이 교전에서 유리합니다.");
+        } catch (e) {
+          log("DEBUG 아이템 에러:", e && e.message);
+        }
+      }, 8000);
+      setTimeout(() => {
+        log("DEBUG: 타임라인 발사");
+        try {
+          openTimeline(() => {
+            pushRespawn({ championKey: "Vayne", name: "FAKE", totalSec: 40 });
+            pushFight({
+              key: "baron",
+              objective: "바론",
+              verdict: "매우 유리",
+              reason: "테스트",
+              secondsTo: 50,
+            });
+            log("DEBUG: 타임라인 push 완료 (timelineWinId=" + timelineWinId + ")");
+          });
+        } catch (e) {
+          log("DEBUG 타임라인 에러:", e && e.message);
+        }
+      }, 10000);
+      setTimeout(() => {
+        log("DEBUG: TTS 발사");
+        try {
+          playTts("테스트 음성입니다. 우리팀이 교전에서 유리합니다.");
+        } catch (e) {
+          log("DEBUG TTS 에러:", e && e.message);
+        }
       }, 12000);
     }
   } else {
