@@ -262,9 +262,11 @@ function handleKillEvents(events) {
     }
     if (!victim.team || victim.team === mySide) continue; // 적만
 
-    // 부활 시간만 (이동 추정 안 함). 곧 all_players의 실제 respawnTimer로 보정됨.
-    const totalSec = Math.round(respawnSeconds(victim.level, latestGameTime));
-    log("적 처치:", victim.championName, "부활", totalSec, "초");
+    // 부활 시간 + 라인복귀 이동. 곧 all_players의 실제 respawnTimer로 보정됨.
+    const totalSec =
+      Math.round(respawnSeconds(victim.level, latestGameTime)) +
+      travelFor(latestGameTime);
+    log("적 처치:", victim.championName, "복귀", totalSec, "초");
     openTimeline(() =>
       pushRespawn({
         championKey: championKeyOf(victim),
@@ -279,10 +281,12 @@ function handleKillEvents(events) {
 let timelineWinId = null;
 
 // 분수대 → 라인 걸어오는 추정 시간(초). 라인마다 거리가 달라 다르게 잡음.
-function travelFor(position) {
-  // 분수대→라인 이동(초). 라인·군화·이속에 따라 변수 → 중간값 추정.
-  const t = { MIDDLE: 15, JUNGLE: 17, TOP: 22, BOTTOM: 22, UTILITY: 20 };
-  return t[(position || "").toUpperCase()] || 18;
+// 분수대→라인 이동(초). 게임이 진행될수록 군화/이속으로 짧아짐.
+function travelFor(gameSec) {
+  const min = (gameSec || 0) / 60;
+  if (min < 8) return 15; // 초반
+  if (min < 20) return 13; // 중반
+  return 12; // 후반
 }
 
 function openTimeline(cb) {
@@ -352,10 +356,11 @@ function updateRespawns(players) {
 
     // 죽는 순간 1회 발사 + (respawnTimer 있으면) 죽어있는 동안 매 스냅샷 정확 보정
     if (justDied || (hasTimer && p.isDead)) {
-      // 부활=도착 가정 → 부활 시간만 (이동 추정 안 함)
-      const totalSec = hasTimer
+      // 부활 시간(정확) + 라인복귀 이동(게임시간 기준 추정)
+      const respawn = hasTimer
         ? Math.ceil(p.respawnTimer)
         : Math.round(respawnSeconds(p.level, latestGameTime));
+      const totalSec = respawn + travelFor(latestGameTime);
       openTimeline(() =>
         pushRespawn({ championKey: championKeyOf(p), name, totalSec })
       );
