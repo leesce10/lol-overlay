@@ -56,6 +56,16 @@
       "type": "dedicated",
       "game_ids": [5426]
     },
-    "game_events": [5426]
+    "game_events": [5426],
+    "externally_connectable": {
+      "matches": [
+        "https://lol-stats-kr.vercel.app",
+        "https://lol-stats-kr.vercel.app/*",
+        "https://*.vercel.app",
+        "https://i.ibb.co/*",
+        "https://ddragon.leagueoflegends.com/*",
+        "https://raw.communitydragon.org/*"
+      ]
+    }
   }
 }
