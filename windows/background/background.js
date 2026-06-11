@@ -186,7 +186,7 @@ setInterval(() => {
     const lcd = res && (res.res || res.info);
     if (lcd && lcd.live_client_data) processLcd(lcd.live_client_data);
   });
-}, 2000);
+}, 1000);
 
 // 진단: 데이터 수신 상태를 아이템 창에 표시 (DEBUG_STATUS true일 때)
 setInterval(() => {
@@ -262,11 +262,9 @@ function handleKillEvents(events) {
     }
     if (!victim.team || victim.team === mySide) continue; // 적만
 
-    // 즉시 표시용(공식 추정 + 라인 이동). 곧 all_players의 실제 respawnTimer로 보정됨.
-    const totalSec =
-      Math.round(respawnSeconds(victim.level, latestGameTime)) +
-      travelFor(victim.position);
-    log("적 처치:", victim.championName, "복귀 예상", totalSec, "초");
+    // 부활 시간만 (이동 추정 안 함). 곧 all_players의 실제 respawnTimer로 보정됨.
+    const totalSec = Math.round(respawnSeconds(victim.level, latestGameTime));
+    log("적 처치:", victim.championName, "부활", totalSec, "초");
     openTimeline(() =>
       pushRespawn({
         championKey: championKeyOf(victim),
@@ -282,9 +280,9 @@ let timelineWinId = null;
 
 // 분수대 → 라인 걸어오는 추정 시간(초). 라인마다 거리가 달라 다르게 잡음.
 function travelFor(position) {
-  // 분수대→라인 도착 시간(초). 초반엔 군화 없어 오래 걸림 → 넉넉히.
-  const t = { MIDDLE: 20, JUNGLE: 22, TOP: 28, BOTTOM: 28, UTILITY: 26 };
-  return t[(position || "").toUpperCase()] || 24;
+  // 분수대→라인 이동(초). 라인·군화·이속에 따라 변수 → 중간값 추정.
+  const t = { MIDDLE: 15, JUNGLE: 17, TOP: 22, BOTTOM: 22, UTILITY: 20 };
+  return t[(position || "").toUpperCase()] || 18;
 }
 
 function openTimeline(cb) {
@@ -354,15 +352,12 @@ function updateRespawns(players) {
 
     // 죽는 순간 1회 발사 + (respawnTimer 있으면) 죽어있는 동안 매 스냅샷 정확 보정
     if (justDied || (hasTimer && p.isDead)) {
-      const base = hasTimer
+      // 부활=도착 가정 → 부활 시간만 (이동 추정 안 함)
+      const totalSec = hasTimer
         ? Math.ceil(p.respawnTimer)
         : Math.round(respawnSeconds(p.level, latestGameTime));
       openTimeline(() =>
-        pushRespawn({
-          championKey: championKeyOf(p),
-          name,
-          totalSec: base + travelFor(p.position),
-        })
+        pushRespawn({ championKey: championKeyOf(p), name, totalSec })
       );
     }
   }
