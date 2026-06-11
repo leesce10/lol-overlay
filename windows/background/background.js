@@ -415,6 +415,75 @@ function objectivesInWindow(gameTime, win) {
   return out.sort((a, b) => a.secondsTo - b.secondsTo);
 }
 
+// ---- 오브젝트 교전 TTS ----------------------------------------------------
+// 같은 오브젝트 인스턴스(스폰 1회)당 60초 전 / 30초 전 / 소환 직후 1번씩 음성 설명.
+const fightTtsSpoken = {}; // instanceId -> Set(stage)
+
+function fightInstanceId(objKey) {
+  const killed = objectiveKills[objKey];
+  return objKey + ":" + (killed == null ? "first" : Math.round(killed));
+}
+
+function verdictPhrase(v) {
+  switch (v) {
+    case "매우 유리":
+      return "지금 교전하면 크게 이득이에요.";
+    case "유리":
+      return "교전 걸기 좋아요.";
+    case "불리":
+      return "지금은 싸움을 피하는 게 좋아요.";
+    case "매우 불리":
+      return "무리하게 싸우지 마세요.";
+    default:
+      return "전력이 비등하니 신중하게 가세요.";
+  }
+}
+
+// 판정의 지배 요인 하나를 자연스러운 말로
+function fightReasonSpoken(res) {
+  const nd = res.numbersDiff || 0;
+  if (nd >= 1) {
+    const late = res.enemy && res.enemy.lateReturns;
+    if (late) return `적 ${late}명이 아직 복귀하지 못했어요.`;
+    return "한타 인원이 우리가 더 많아요.";
+  }
+  if (nd <= -1) {
+    const late = res.my && res.my.lateReturns;
+    if (late) return `아군 ${late}명이 제때 복귀하지 못해요.`;
+    return "한타 인원이 상대가 더 많아요.";
+  }
+  const ld = res.avgLevelDiff || 0;
+  if (Math.abs(ld) >= 0.5)
+    return ld > 0 ? "평균 레벨이 우리가 앞서요." : "평균 레벨이 상대가 앞서요.";
+  const gd = res.goldDiff || 0;
+  if (Math.abs(gd) >= 800)
+    return gd > 0 ? "아이템이 우리가 더 좋아요." : "아이템이 상대가 더 좋아요.";
+  return "양 팀 전력이 비슷해요.";
+}
+
+function buildFightTts(res, stage, label, sec) {
+  const reason = fightReasonSpoken(res);
+  const verdict = verdictPhrase(res.verdict);
+  let lead;
+  if (stage === "60") lead = `잠시 뒤 ${label}이 생성됩니다.`;
+  else if (stage === "30") lead = `${label} 생성 30초 전입니다.`;
+  else lead = sec <= 0 ? `${label}이 생성됐어요.` : `${label}이 곧 생성됩니다.`;
+  return `${lead} ${reason} ${verdict}`;
+}
+
+function maybeFightTts(res, obj) {
+  // 남은 시간으로 단계 결정: ~60초 전 / ~30초 전 / 소환 직후
+  const sec = obj.secondsTo;
+  const stage = sec >= 40 ? "60" : sec >= 5 ? "30" : "spawn";
+  const inst = fightInstanceId(obj.key);
+  if (!fightTtsSpoken[inst]) fightTtsSpoken[inst] = new Set();
+  if (fightTtsSpoken[inst].has(stage)) return;
+  fightTtsSpoken[inst].add(stage);
+  const text = buildFightTts(res, stage, obj.label, sec);
+  log("교전 TTS:", stage, text);
+  playTts(text);
+}
+
 // 스폰 60초 전부터, 8초마다 교전 분석 갱신
 function maybeFightAnalysis() {
   if (!latestPlayers.length) return;
@@ -422,7 +491,9 @@ function maybeFightAnalysis() {
   if (!upcoming.length) return;
 
   const now = Date.now();
-  if (now - lastFightFetch < 8000) return; // 스로틀
+  // 스폰 임박 시엔 더 촘촘히(소환 직후 TTS를 제때 발사)
+  const soon = upcoming[0].secondsTo <= 12;
+  if (now - lastFightFetch < (soon ? 3000 : 8000)) return; // 스로틀
   lastFightFetch = now;
 
   const obj = upcoming[0];
@@ -459,6 +530,7 @@ function maybeFightAnalysis() {
           secondsTo: obj.secondsTo,
         })
       );
+      maybeFightTts(res, obj);
     })
     .catch((e) => log("교전 분석 실패", e));
 }
