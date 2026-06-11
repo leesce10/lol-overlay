@@ -40,8 +40,8 @@ function render() {
   for (const [id, t] of timers) {
     const remainMs = t.endAt - now;
     const remainSec = Math.ceil(remainMs / 1000);
-    if (remainMs <= -2500) {
-      // 복귀 후 잠시 뒤 제거
+    if (remainMs <= -1000) {
+      // "복귀" 표시 1초 뒤 제거
       t.el.remove();
       timers.delete(id);
       continue;
