@@ -2,7 +2,7 @@
 // Data Dragon CDN에서 아이템 아이콘을 가져온다.
 
 // TODO: 패치 버전을 동적으로(최신) 가져오기. 지금은 고정.
-const DDRAGON_VERSION = "15.1.1";
+const DDRAGON_VERSION = "15.7.1";
 const ITEM_ICON = (id) =>
   `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/item/${id}.png`;
 const CHAMP_ICON = (key) =>

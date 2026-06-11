@@ -39,6 +39,17 @@
         "show_in_taskbar": false,
         "size": { "width": 380, "height": 460 },
         "start_position": { "top": 80, "left": 480 }
+      },
+      "respawn": {
+        "file": "windows/respawn/respawn.html",
+        "transparent": true,
+        "clickthrough": true,
+        "topmost": true,
+        "in_game_only": true,
+        "resizable": false,
+        "show_in_taskbar": false,
+        "size": { "width": 120, "height": 460 },
+        "start_position": { "top": 120, "left": 8 }
       }
     },
     "game_targeting": {

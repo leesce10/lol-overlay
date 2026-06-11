@@ -76,6 +76,16 @@ overwolf.games.events.onInfoUpdates2.addListener((info) => {
     }
   }
 
+  // 게임 시간
+  if (lcd.game_data) {
+    try {
+      const gd = JSON.parse(lcd.game_data);
+      if (typeof gd.gameTime === "number") latestGameTime = gd.gameTime;
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
   // all_players 는 JSON 문자열로 들어온다.
   if (lcd.all_players) {
     let players;
@@ -85,10 +95,82 @@ overwolf.games.events.onInfoUpdates2.addListener((info) => {
       log("all_players 파싱 실패", e);
       return;
     }
+    latestPlayers = players;
     maybeBriefing(players);
     detectNewItems(players);
   }
+
+  // 킬 이벤트 → 적 부활 타이머
+  if (lcd.events) {
+    try {
+      const parsed = JSON.parse(lcd.events);
+      handleKillEvents(parsed.Events || []);
+    } catch (e) {
+      /* ignore */
+    }
+  }
 });
+
+// ---- 적 처치 → 복귀 타이머 ------------------------------------------------
+
+let latestPlayers = [];
+let latestGameTime = 0;
+const processedKills = new Set();
+
+// 부활 대기시간(초): 레벨별 기본값 × (1 + 시간증가계수). 레벨·게임시간은 화면에 보임.
+function respawnSeconds(level, gameSec) {
+  const BRW = [
+    10, 10, 12, 12, 14, 16, 20, 25, 28.5, 32.5, 35, 37.5, 40, 42.5, 45, 47.5,
+    50, 52.5,
+  ];
+  const lvl = Math.max(1, Math.min(18, Math.round(level || 1)));
+  const min = (gameSec || 0) / 60;
+  const tif = min > 15 ? Math.min(0.5, (min - 15) * 0.02) : 0;
+  return BRW[lvl - 1] * (1 + tif);
+}
+
+function handleKillEvents(events) {
+  const mySide = myTeamSide(latestPlayers);
+  for (const ev of events) {
+    if (ev.EventName !== "ChampionKill") continue;
+    const key = `${ev.EventID}-${ev.EventName}`;
+    if (processedKills.has(key)) continue;
+    processedKills.add(key);
+
+    const victim = latestPlayers.find(
+      (p) => (p.riotId || p.summonerName) === ev.VictimName
+    );
+    if (!victim) continue;
+    if (!victim.team || victim.team === mySide) continue; // 적만
+
+    const respawn = respawnSeconds(victim.level, latestGameTime);
+    const totalSec = Math.round(respawn) + 12; // + 라인 복귀 이동(추정)
+    log("적 처치:", victim.championName, "복귀 예상", totalSec, "초");
+    openRespawn(() =>
+      pushRespawn({
+        championKey: championKeyOf(victim),
+        name: victim.riotId || victim.summonerName,
+        totalSec,
+      })
+    );
+  }
+}
+
+let respawnWinId = null;
+
+function openRespawn(cb) {
+  overwolf.windows.obtainDeclaredWindow("respawn", (res) => {
+    if (!res.success) return log("respawn 창 obtain 실패", res);
+    respawnWinId = res.window.id;
+    overwolf.windows.restore(respawnWinId, () => cb && cb());
+  });
+}
+
+function pushRespawn(payload) {
+  if (respawnWinId) {
+    overwolf.windows.sendMessage(respawnWinId, "respawn-add", payload, () => {});
+  }
+}
 
 // ---- 게임 시작 조합 브리핑 ------------------------------------------------
 
