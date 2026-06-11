@@ -161,10 +161,11 @@ function handleKillEvents(events) {
     if (processedKills.has(key)) continue;
     processedKills.add(key);
 
-    const victim = latestPlayers.find(
-      (p) => (p.riotId || p.summonerName) === ev.VictimName
-    );
-    if (!victim) continue;
+    const victim = latestPlayers.find((p) => sameName(p, ev.VictimName));
+    if (!victim) {
+      log("처치 victim 매칭 실패:", ev.VictimName);
+      continue;
+    }
     if (!victim.team || victim.team === mySide) continue; // 적만
 
     const respawn = respawnSeconds(victim.level, latestGameTime);
@@ -368,11 +369,21 @@ overwolf.games.events.onNewEvents.addListener((e) => {
 // 그 변화를 diff로 잡아 "보였을 때 새 아이템"을 알린다. 클라이언트가 이미 아는
 // 정보만 사용하므로 ToS 준수.
 
+// 이름 비교: 태그(#KR1) 떼고 소문자로. riotId/summonerName/riotIdGameName 모두 시도
+function nameKey(s) {
+  return (s || "").split("#")[0].trim().toLowerCase();
+}
+function sameName(player, name) {
+  const k = nameKey(name);
+  if (!k) return false;
+  return [player.riotId, player.summonerName, player.riotIdGameName].some(
+    (c) => nameKey(c) === k
+  );
+}
+
 function myTeamSide(players) {
   if (!activeSummoner) return "ORDER";
-  const me = players.find((p) =>
-    (p.riotId || p.summonerName || "").startsWith(activeSummoner)
-  );
+  const me = players.find((p) => sameName(p, activeSummoner));
   return me ? me.team : "ORDER";
 }
 
