@@ -247,6 +247,8 @@ function handleKillEvents(events) {
         processedKills.add(key);
         objectiveKills[objKey] = ev.EventTime;
         log("오브젝트 처치:", objKey, "@", Math.round(ev.EventTime));
+        // 처치되면 timeline의 해당 오브젝트 마커 제거
+        if (timelineWinId) pushTimeline("fight-clear", { key: objKey });
       }
       continue;
     }
@@ -266,7 +268,7 @@ function handleKillEvents(events) {
     // 부활 시간 + 라인복귀 이동. 곧 all_players의 실제 respawnTimer로 보정됨.
     const totalSec =
       Math.round(respawnSeconds(victim.level, latestGameTime)) +
-      travelFor(latestGameTime, victim.position);
+      travelFor(latestGameTime, victim.position, hasBoots(victim));
     log("적 처치:", victim.championName, "복귀", totalSec, "초");
     openTimeline(() =>
       pushRespawn({
@@ -282,12 +284,21 @@ function handleKillEvents(events) {
 let timelineWinId = null;
 
 // 분수대 → 라인 걸어오는 추정 시간(초). 라인마다 거리가 달라 다르게 잡음.
-// 분수대→라인 이동(초). 게임 진행될수록 군화/이속으로 짧아짐. 탑/바텀은 더 멀어 +4.
-function travelFor(gameSec, position) {
+// 신발 아이템 ID (있으면 이동 빨라짐)
+const BOOTS_IDS = new Set([
+  1001, 3006, 3009, 3020, 3047, 3111, 3117, 3158,
+]);
+function hasBoots(p) {
+  return (p.items || []).some((it) => BOOTS_IDS.has(it.itemID));
+}
+
+// 분수대→라인 이동(초). 게임 진행될수록 짧아짐. 탑/바텀/서폿 +5, 신발 있으면 -2.
+function travelFor(gameSec, position, boots) {
   const min = (gameSec || 0) / 60;
   let t = min < 8 ? 15 : min < 20 ? 13 : 12;
   const pos = (position || "").toUpperCase();
-  if (pos === "TOP" || pos === "BOTTOM") t += 4;
+  if (pos === "TOP" || pos === "BOTTOM" || pos === "UTILITY") t += 5;
+  if (boots) t -= 2;
   return t;
 }
 
@@ -365,7 +376,7 @@ function updateRespawns(players) {
       const respawn = hasTimer
         ? Math.ceil(p.respawnTimer)
         : Math.round(respawnSeconds(p.level, latestGameTime));
-      const totalSec = respawn + travelFor(latestGameTime, p.position);
+      const totalSec = respawn + travelFor(latestGameTime, p.position, hasBoots(p));
       openTimeline(() =>
         pushRespawn({ championKey: championKeyOf(p), name, totalSec })
       );

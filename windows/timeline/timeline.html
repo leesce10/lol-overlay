@@ -121,6 +121,19 @@
         color: #eef2ff;
         text-shadow: 0 1px 3px #000;
       }
+      .f-sec {
+        margin-top: 3px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #ffe9a8;
+        background: rgba(10, 12, 18, 0.8);
+        border-radius: 5px;
+        padding: 1px 6px;
+        white-space: nowrap;
+      }
+      .f-marker.spawned .f-sec {
+        display: none;
+      }
       .verdict {
         position: absolute;
         left: 54px;
@@ -188,9 +201,11 @@
       };
       const FIGHT_WINDOW = 60;
       const track = document.getElementById("track");
-      // 하단에 마커(아이콘+라벨) 들어갈 여유 54px 확보 → 도착 표시 안 잘림
+      // 하단에 오브젝트 슬롯(복귀 아래 한 칸) 들어갈 여유 확보
       const posFor = (prog, h) =>
-        14 + Math.max(0, Math.min(1, prog)) * (h - 68);
+        14 + Math.max(0, Math.min(1, prog)) * (h - 150);
+      // 오브젝트가 소환 완료 후 멈추는 위치(중심): 복귀 도착 위치보다 한 칸 더 아래
+      const objBottom = (h) => posFor(1, h) + 50;
 
       const timers = new Map();
       function addRespawn({ championKey, name, totalSec }) {
@@ -222,14 +237,13 @@
       }
 
       let fight = null,
-        fHideAt = 0,
         fEl = null;
       function ensureFightEl() {
         if (fEl) return fEl;
         fEl = document.createElement("div");
         fEl.className = "f-marker";
         fEl.innerHTML =
-          '<img class="fimg" alt="" /><span class="verdict"></span><div class="f-name"></div>';
+          '<img class="fimg" alt="" /><span class="verdict"></span><div class="f-name"></div><div class="f-sec"></div>';
         track.appendChild(fEl);
         return fEl;
       }
@@ -242,9 +256,17 @@
         v.textContent = verdict || "";
         v.className = "verdict " + (VCLASS[verdict] || "even");
         el.querySelector(".f-name").textContent = objective || "";
-        fight = { spawnAt: Date.now() + Math.max(0, secondsTo) * 1000 };
-        fHideAt = Date.now() + 25000;
+        fight = { key, spawnAt: Date.now() + Math.max(0, secondsTo) * 1000 };
         el.classList.remove("hidden");
+      }
+      function clearFight(key) {
+        // 해당 오브젝트가 처치됨 → 마커 제거
+        if (fight && key && fight.key !== key) return;
+        if (fEl) {
+          fEl.remove();
+          fEl = null;
+        }
+        fight = null;
       }
 
       function render() {
@@ -263,11 +285,21 @@
           t.el.classList.toggle("back", back);
           t.sec.textContent = back ? "복귀" : `${Math.ceil(rem / 1000)}s`;
         }
-        if (fight && fEl && !fEl.classList.contains("hidden")) {
-          if (now > fHideAt) fEl.classList.add("hidden");
-          else {
-            const rem = Math.max(0, (fight.spawnAt - now) / 1000);
-            fEl.style.top = `${posFor(1 - rem / FIGHT_WINDOW, h)}px`;
+        if (fight && fEl) {
+          const ob = objBottom(h);
+          const remMs = fight.spawnAt - now;
+          const fSec = fEl.querySelector(".f-sec");
+          if (remMs > 0) {
+            // 소환 전: 내려오면서 생성까지 남은 시간 표시
+            const prog = 1 - remMs / (FIGHT_WINDOW * 1000);
+            const center = 14 + Math.max(0, Math.min(1, prog)) * (ob - 14);
+            fEl.style.top = `${center}px`;
+            if (fSec) fSec.textContent = `${Math.ceil(remMs / 1000)}s`;
+            fEl.classList.remove("spawned");
+          } else {
+            // 소환 완료: 맨 하단(복귀 아래 한 칸)에 고정, 처치될 때까지 유지
+            fEl.style.top = `${ob}px`;
+            fEl.classList.add("spawned");
           }
         }
         requestAnimationFrame(render);
@@ -278,6 +310,7 @@
         if (!content) return;
         if (id === "respawn-add") addRespawn(content);
         else if (id === "fight-update") updateFight(content);
+        else if (id === "fight-clear") clearFight(content.key);
       }
 
       // 네이티브 Overwolf 창: background가 보내는 메시지 직접 수신
