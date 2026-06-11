@@ -170,27 +170,39 @@ overwolf.games.events.onNewEvents.addListener((e) => {
   log("event:", JSON.stringify(e));
 });
 
-// ---- 아이템 diff 로직 -----------------------------------------------------
+// ---- 적 아이템 구매 감지 --------------------------------------------------
+// LoL은 적이 시야에 들어와야 그 적의 아이템 정보가 갱신된다(탭 스코어보드와 동일).
+// 그 변화를 diff로 잡아 "보였을 때 새 아이템"을 알린다. 클라이언트가 이미 아는
+// 정보만 사용하므로 ToS 준수.
+
+function myTeamSide(players) {
+  if (!activeSummoner) return "ORDER";
+  const me = players.find((p) =>
+    (p.riotId || p.summonerName || "").startsWith(activeSummoner)
+  );
+  return me ? me.team : "ORDER";
+}
 
 function detectNewItems(players) {
   if (!Array.isArray(players)) return;
+  const mySide = myTeamSide(players);
 
   players.forEach((p) => {
     const name = p.summonerName || p.riotId || "unknown";
-    const items = (p.items || []).map((it) => it.itemID);
+    const allItems = p.items || [];
+    const items = allItems.map((it) => it.itemID);
     const curr = new Set(items);
     const prev = prevItems.get(name);
+    const isEnemy = p.team && p.team !== mySide;
 
-    if (prev) {
+    // prev가 있어야(=두 번째 스냅샷부터) 변화로 인정 → 시작 아이템은 알리지 않음
+    if (prev && isEnemy) {
       const added = items.filter((id) => !prev.has(id));
       added.forEach((itemID) => {
-        const meta = (p.items || []).find((it) => it.itemID === itemID);
-        // TODO: 내 맞라인만 필터링 (position/team 비교). 지금은 전체 알림.
+        const meta = allItems.find((it) => it.itemID === itemID);
+        if (meta && meta.consumable) return; // 포션/와드 등 소비템 제외(노이즈)
         notifyOverlay({
-          summonerName: name,
           championName: p.championName,
-          team: p.team, // "ORDER" | "CHAOS"
-          position: p.position, // "MIDDLE" 등 (소환사의 협곡에서 제공)
           itemID,
           itemName: meta ? meta.displayName : String(itemID),
         });

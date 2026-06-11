@@ -8,13 +8,13 @@ const ITEM_ICON = (id) =>
 
 const toasts = document.getElementById("toasts");
 
-function teamLabel(team) {
-  return team === "CHAOS" ? "레드" : team === "ORDER" ? "블루" : "";
-}
-
-function showToast({ championName, itemName, itemID, team }) {
+function showToast({ championName, itemName, itemID }) {
   const el = document.createElement("div");
   el.className = "toast";
+
+  const badge = document.createElement("span");
+  badge.className = "enemy-badge";
+  badge.textContent = "적";
 
   const img = document.createElement("img");
   img.src = ITEM_ICON(itemID);
@@ -25,8 +25,9 @@ function showToast({ championName, itemName, itemID, team }) {
   const text = document.createElement("div");
   text.className = "text";
   const who = championName || "상대";
-  text.innerHTML = `${teamLabel(team)} <b>${who}</b> 아이템 완성<br/>${itemName}`;
+  text.innerHTML = `<b>${who}</b> 구매<br/>${itemName}`;
 
+  el.appendChild(badge);
   el.appendChild(img);
   el.appendChild(text);
   toasts.appendChild(el);
