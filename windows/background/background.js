@@ -9,9 +9,9 @@
 const LOL_CLASS_ID = 5426;
 const REQUIRED_FEATURES = ["live_client_data"];
 
-// 테스트용: true면 게임 시작 ~12초 후 가짜 적 코어템 알림 1회 (위치·디자인 즉시 확인용).
-// ⚠️ 지인 배포 전에는 반드시 false 로!
-const DEBUG_FAKE_CORE_ITEM = false;
+// 테스트용: true면 게임 시작 ~12초 후 가짜 아이템+복귀+교전+TTS 한 번에 (확인용).
+// ⚠️ 지인 배포 전에는 반드시 false 로!  (지금은 테스트 위해 켜둠)
+const DEBUG_FAKE_CORE_ITEM = true;
 
 // 플레이어별 이전 아이템 집합 (summonerName -> Set<itemID>)
 const prevItems = new Map();
