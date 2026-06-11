@@ -612,7 +612,8 @@ function positionOverlay() {
     const w = info.logicalWidth || info.width;
     const h = info.logicalHeight || info.height;
     if (!w || !h) return;
-    const left = Math.round((w - OVERLAY_W) / 2);
+    // 가운데 정렬 + 살짝 왼쪽으로(텍스트가 오른쪽으로 길어 무게중심 보정)
+    const left = Math.round((w - OVERLAY_W) / 2) - 70;
     // 창 아래쪽 가장자리(= 토스트 위치)가 화면 바닥에서 SKILL_CLEARANCE 만큼 위
     const top = Math.round(h - SKILL_CLEARANCE - OVERLAY_H);
     overwolf.windows.changePosition(overlayId, left, top, () =>
