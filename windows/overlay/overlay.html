@@ -27,26 +27,27 @@
       .toast {
         display: flex;
         align-items: center;
-        gap: 18px;
+        gap: 14px;
         padding: 4px 0;
         color: #eef2ff;
+        white-space: nowrap;
         filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.95));
         animation: in 0.18s ease-out, out 0.4s ease-in 4.6s forwards;
       }
       .enemy-badge {
         flex: 0 0 auto;
-        font-size: 22px;
+        font-size: 18px;
         font-weight: 700;
         color: #fff;
         background: #c0392b;
-        border-radius: 10px;
-        padding: 5px 12px;
+        border-radius: 8px;
+        padding: 4px 10px;
       }
       .toast img {
-        width: 68px;
-        height: 68px;
+        width: 56px;
+        height: 56px;
         max-width: none;
-        border-radius: 10px;
+        border-radius: 8px;
         flex: 0 0 auto;
       }
       .toast img.champ {
@@ -54,8 +55,9 @@
         border: 2px solid rgba(255, 255, 255, 0.4);
       }
       .toast .text {
-        font-size: 24px;
+        font-size: 20px;
         line-height: 1.25;
+        white-space: nowrap;
         text-shadow: 0 1px 3px #000, 0 0 5px #000;
       }
       .toast .text b {

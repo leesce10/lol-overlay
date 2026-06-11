@@ -261,17 +261,17 @@ function openTimeline(cb) {
   });
 }
 
-// 디버그: 타임라인 창을 화면 중앙으로 (렌더 확인용. 확인되면 좌측으로 되돌림)
+// 좌측 사이드(세로 가운데쯤)에 배치
 function positionTimeline() {
   overwolf.games.getRunningGameInfo((info) => {
     if (!info) return;
     const w = info.logicalWidth || info.width;
     const h = info.logicalHeight || info.height;
     if (!w || !h) return;
-    const left = Math.round((w - 240) / 2);
-    const top = Math.round((h - 600) / 2);
+    const left = 8;
+    const top = Math.max(40, Math.round((h - 600) / 2));
     overwolf.windows.changePosition(timelineWinId, left, top, () =>
-      log("timeline 위치(중앙):", left, top, "(", w, "x", h, ")")
+      log("timeline 위치(좌측):", left, top, "(", w, "x", h, ")")
     );
   });
 }
@@ -570,7 +570,7 @@ let overlayId = null;
 const OVERLAY_W = 760;
 const OVERLAY_H = 220;
 // 화면 하단에서 토스트 아래 가장자리까지 거리(px). 클수록 더 위로. (스킬창 조금 위)
-const SKILL_CLEARANCE = 420;
+const SKILL_CLEARANCE = 480;
 
 function openOverlay() {
   overwolf.windows.obtainDeclaredWindow("overlay", (res) => {
