@@ -253,6 +253,21 @@ function handleKillEvents(events) {
       continue;
     }
 
+    // 내 라인 1차 타워 파괴 → 라인전 종료로 간주(복귀 UI 끔)
+    if (ev.EventName === "TurretKilled") {
+      if (!processedKills.has(key)) {
+        processedKills.add(key);
+        const tname = ev.TurretKilled || "";
+        const m = tname.match(/Turret_T[12]_([LCR])_/);
+        const myLane = myLaneLetter();
+        if (m && myLane && m[1] === myLane) {
+          lanePhaseOver = true;
+          log("내 라인 타워 파괴 → 라인복귀 UI 종료:", tname);
+        }
+      }
+      continue;
+    }
+
     if (ev.EventName !== "ChampionKill") continue;
     if (processedKills.has(key)) continue;
     processedKills.add(key);
@@ -263,7 +278,7 @@ function handleKillEvents(events) {
       continue;
     }
     if (!victim.team || victim.team === mySide) continue; // 적만
-    if (latestGameTime >= LANE_PHASE_END) continue; // 라인전 끝나면 복귀 UI 끔
+    if (lanePhaseDone()) continue; // 라인전 끝나면 복귀 UI 끔
 
     // 부활 시간 + 라인복귀 이동. 곧 all_players의 실제 respawnTimer로 보정됨.
     const totalSec =
@@ -309,7 +324,24 @@ function travelFor(gameSec, position, boots) {
   return t;
 }
 
-const LANE_PHASE_END = 1200; // 20분 — 이후 라인복귀 UI 비활성화
+const LANE_PHASE_END = 1200; // 20분 — 안전망(정글이거나 타워 이벤트 놓쳤을 때)
+let lanePhaseOver = false; // 내 라인 1차 타워 파괴 시 true
+
+// 내 포지션 → 포탑 이름의 라인 문자 (L=탑, C=미드, R=바텀)
+function myLaneLetter() {
+  if (!activeSummoner) return null;
+  const me = latestPlayers.find((p) => sameName(p, activeSummoner));
+  const pos = (me && me.position ? me.position : "").toUpperCase();
+  if (pos === "TOP") return "L";
+  if (pos === "MIDDLE" || pos === "MID") return "C";
+  if (pos === "BOTTOM" || pos === "UTILITY") return "R";
+  return null; // 정글 등 → 라인 타워 기준 없음, 20분 폴백
+}
+
+// 라인복귀 UI를 더 보여줄지: 내 라인 타워가 깨졌거나 20분 지났으면 종료
+function lanePhaseDone() {
+  return lanePhaseOver || latestGameTime >= LANE_PHASE_END;
+}
 
 function openTimeline(cb) {
   if (timelineWinId) {
@@ -360,7 +392,7 @@ function deathCount(p) {
   return (p.scores && (p.scores.deaths ?? p.scores.death)) || 0;
 }
 function updateRespawns(players) {
-  if (latestGameTime >= LANE_PHASE_END) return; // 라인전 끝나면 복귀 UI 끔
+  if (lanePhaseDone()) return; // 라인전 끝나면 복귀 UI 끔
   const mySide = myTeamSide(players);
   for (const p of players) {
     if (!p.team || p.team === mySide) continue; // 적만
