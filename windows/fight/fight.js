@@ -1,4 +1,16 @@
-// fight.js — background가 보내는 오브젝트 교전 분석 결과를 표시.
+// fight.js — 오브젝트 교전 분석을 세로 타임라인으로 표시.
+// background가 보내는 { key, objective, verdict, reason, secondsTo } 를 받아
+// 오브젝트 초상화 + 이름 + 판정 라벨을 라인 위에서 스폰까지 내려보낸다.
+
+const OBJ_BASE =
+  "https://raw.communitydragon.org/latest/game/assets/ux/minimap/icons";
+const OBJ_ICON = {
+  dragon: OBJ_BASE + "/dragon.png",
+  elder: OBJ_BASE + "/dragon_elder.png",
+  baron: OBJ_BASE + "/baron.png",
+  herald: OBJ_BASE + "/riftherald.png",
+  grubs: OBJ_BASE + "/grub.png",
+};
 
 const VERDICT_CLASS = {
   "매우 유리": "veryGood",
@@ -8,27 +20,49 @@ const VERDICT_CLASS = {
   "매우 불리": "veryBad",
 };
 
-const card = document.getElementById("card");
-const objEl = document.getElementById("obj");
-const verdictEl = document.getElementById("verdict");
-const reasonEl = document.getElementById("reason");
-const spawnEl = document.getElementById("spawn");
+const WINDOW_SEC = 60; // 스폰 몇 초 전부터 타임라인에 표시하는지
 
+const track = document.getElementById("track");
+const marker = document.getElementById("marker");
+const objIcon = document.getElementById("obj-icon");
+const objName = document.getElementById("obj-name");
+const verdictEl = document.getElementById("verdict");
+
+let current = null; // { key, objective, verdict, endAt }
 let hideTimer = null;
 
-function update({ objective, verdict, reason, secondsTo }) {
-  objEl.textContent = objective || "오브젝트";
-  verdictEl.textContent = verdict || "";
-  verdictEl.className = "verdict " + (VERDICT_CLASS[verdict] || "even");
-  reasonEl.textContent = reason || "";
-  spawnEl.textContent =
-    secondsTo > 0 ? `스폰까지 ${secondsTo}s` : "스폰됨 — 지금 결정";
-  card.classList.remove("hidden");
+function update(data) {
+  current = {
+    key: data.key,
+    objective: data.objective,
+    verdict: data.verdict,
+    // secondsTo 기준 스폰 시각 추정
+    spawnAt: Date.now() + Math.max(0, data.secondsTo) * 1000,
+  };
+  objIcon.src = OBJ_ICON[data.key] || OBJ_ICON.dragon;
+  objIcon.onerror = () => (objIcon.style.visibility = "hidden");
+  objName.textContent = data.objective || "";
+  verdictEl.textContent = data.verdict || "";
+  verdictEl.className = "verdict " + (VERDICT_CLASS[data.verdict] || "even");
+  track.classList.remove("hidden");
 
-  // 갱신 없으면 20초 뒤 숨김(오브젝트 지나감)
   if (hideTimer) clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => card.classList.add("hidden"), 20000);
+  // 갱신 없으면 25초 뒤 숨김(오브젝트 지나감)
+  hideTimer = setTimeout(() => track.classList.add("hidden"), 25000);
 }
+
+function render() {
+  if (current && !track.classList.contains("hidden")) {
+    const h = track.clientHeight || 460;
+    const remain = Math.max(0, (current.spawnAt - Date.now()) / 1000);
+    // 위(스폰 멀었음) → 아래(스폰 임박)
+    const progress = Math.min(1, 1 - remain / WINDOW_SEC);
+    const top = 14 + progress * (h - 28);
+    marker.style.top = `${top}px`;
+  }
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
 
 if (typeof overwolf !== "undefined") {
   overwolf.windows.onMessageReceived.addListener((msg) => {
@@ -38,9 +72,10 @@ if (typeof overwolf !== "undefined") {
 
 if (location.search.includes("demo")) {
   update({
+    key: "baron",
     objective: "바론",
     verdict: "매우 유리",
-    reason: "수적 우위 5:4 (적 1명 복귀 못 함) · 평균 레벨 +1.0",
+    reason: "수적 우위 5:4",
     secondsTo: 45,
   });
 }

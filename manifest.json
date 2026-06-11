@@ -59,8 +59,8 @@
         "in_game_only": true,
         "resizable": false,
         "show_in_taskbar": false,
-        "size": { "width": 190, "height": 96 },
-        "start_position": { "top": 600, "left": 8 }
+        "size": { "width": 220, "height": 460 },
+        "start_position": { "top": 110, "left": 150 }
       }
     },
     "game_targeting": {

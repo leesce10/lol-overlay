@@ -6,13 +6,18 @@
     <link rel="stylesheet" href="fight.css" />
   </head>
   <body>
-    <div id="card" class="hidden">
-      <div class="row">
-        <span id="obj" class="obj"></span>
-        <span id="verdict" class="verdict"></span>
+    <div id="track" class="hidden">
+      <div class="rail"></div>
+      <span class="node node-top"></span>
+      <span class="node node-bot"></span>
+      <!-- 오브젝트 마커: 초상화 + 이름 + 판정 -->
+      <div id="marker" class="marker">
+        <div class="box">
+          <img id="obj-icon" alt="objective" />
+          <span id="verdict" class="verdict"></span>
+        </div>
+        <div id="obj-name" class="obj-name"></div>
       </div>
-      <div id="reason" class="reason"></div>
-      <div id="spawn" class="spawn"></div>
     </div>
     <script src="fight.js"></script>
   </body>

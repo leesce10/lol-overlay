@@ -303,6 +303,7 @@ function maybeFightAnalysis() {
       log("교전 분석:", obj.label, res.verdict);
       openFight(() =>
         pushFight({
+          key: obj.key,
           objective: obj.label,
           verdict: res.verdict,
           reason: res.reason,

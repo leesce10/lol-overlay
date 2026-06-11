@@ -16,6 +16,37 @@ body {
   height: 100%;
 }
 
+/* 세로 라인 + 다이아몬드 노드 */
+.rail {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to bottom,
+    rgba(202, 161, 74, 0.15),
+    rgba(202, 161, 74, 0.6),
+    rgba(202, 161, 74, 0.15)
+  );
+}
+.node {
+  position: absolute;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  background: #caa14a;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 6px rgba(202, 161, 74, 0.6);
+}
+.node-top {
+  top: 14px;
+}
+.node-bot {
+  top: calc(100% - 14px);
+}
+
 .respawn-entry {
   position: absolute;
   left: 0;
