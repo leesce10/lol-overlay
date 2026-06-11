@@ -236,10 +236,26 @@ const OBJ_EVENT = {
   HeraldKill: "herald",
 };
 
+// 이벤트 객체의 모든 문자열 필드에서 포탑 이름을 찾는다(필드명 차이에 견고)
+function findTurretName(ev) {
+  if (typeof ev.TurretKilled === "string") return ev.TurretKilled;
+  for (const v of Object.values(ev)) {
+    if (typeof v === "string" && /Turret_T[12]_[LCR]_/.test(v)) return v;
+  }
+  return "";
+}
+
+const loggedEventTypes = new Set(); // 이벤트 종류별 1회 구조 로그(진단)
 function handleKillEvents(events) {
   const mySide = myTeamSide(latestPlayers);
   for (const ev of events) {
     const key = `${ev.EventID}-${ev.EventName}`;
+
+    // 진단: 처음 보는 이벤트 종류는 전체 구조를 한 번 로깅
+    if (ev.EventName && !loggedEventTypes.has(ev.EventName)) {
+      loggedEventTypes.add(ev.EventName);
+      log("이벤트 수신:", ev.EventName, JSON.stringify(ev));
+    }
 
     // 오브젝트 처치 → 재스폰 계산용 기록
     const objKey = OBJ_EVENT[ev.EventName];
@@ -255,10 +271,10 @@ function handleKillEvents(events) {
     }
 
     // 내 라인 1차 타워 파괴 → 라인전 종료로 간주(복귀 UI 끔)
-    if (ev.EventName === "TurretKilled") {
+    if (ev.EventName === "TurretKilled" || /turret/i.test(ev.EventName || "")) {
       if (!processedKills.has(key)) {
         processedKills.add(key);
-        const tname = ev.TurretKilled || "";
+        const tname = findTurretName(ev);
         const m = tname.match(/Turret_T[12]_([LCR])_/);
         const myLane = myLaneLetter();
         const laneMatch = !!(m && myLane && m[1] === myLane);
