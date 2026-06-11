@@ -269,7 +269,7 @@ function positionTimeline() {
     const h = info.logicalHeight || info.height;
     if (!w || !h) return;
     const left = 8;
-    const top = Math.max(40, Math.round((h - 600) / 2));
+    const top = Math.max(40, Math.round((h - 600) / 2) - 90);
     overwolf.windows.changePosition(timelineWinId, left, top, () =>
       log("timeline 위치(좌측):", left, top, "(", w, "x", h, ")")
     );
@@ -287,19 +287,44 @@ function pushFight(payload) {
   pushTimeline("fight-update", payload);
 }
 
-// all_players의 실제 respawnTimer로 매 스냅샷 보정 (공식 추정보다 정확)
+// 적 사망 감지 → 복귀 타이머. respawnTimer 있으면 매 스냅샷 정확 보정,
+// 없으면 "살아있음→죽음" 전환 순간 1회 공식 추정(이후 창이 카운트다운).
+const prevDead = new Map();
+let loggedDeadSample = false;
 function updateRespawns(players) {
   const mySide = myTeamSide(players);
   for (const p of players) {
     if (!p.team || p.team === mySide) continue; // 적만
-    if (p.isDead && p.respawnTimer > 0) {
-      const name = p.riotId || p.summonerName;
+    const name = p.riotId || p.summonerName || p.championName;
+    const wasDead = prevDead.get(name) || false;
+    prevDead.set(name, !!p.isDead);
+    if (!p.isDead) continue;
+
+    // 진단: 첫 사망 적의 필드 한 번 로그 (respawnTimer 들어오는지 확인용)
+    if (!loggedDeadSample) {
+      loggedDeadSample = true;
+      log(
+        "죽은 적 샘플:",
+        name,
+        "| isDead=",
+        p.isDead,
+        "respawnTimer=",
+        p.respawnTimer,
+        "level=",
+        p.level
+      );
+    }
+
+    const hasTimer = typeof p.respawnTimer === "number" && p.respawnTimer > 0;
+    if (hasTimer || !wasDead) {
+      const base = hasTimer
+        ? Math.ceil(p.respawnTimer)
+        : Math.round(respawnSeconds(p.level, latestGameTime));
       openTimeline(() =>
         pushRespawn({
           championKey: championKeyOf(p),
           name,
-          // 정확한 부활 타이머 + 라인별 걸어오는 시간(추정)
-          totalSec: Math.ceil(p.respawnTimer) + travelFor(p.position),
+          totalSec: base + travelFor(p.position),
         })
       );
     }

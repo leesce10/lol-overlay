@@ -23,7 +23,7 @@
         position: absolute;
         left: 60px;
         top: 14px;
-        bottom: 14px;
+        bottom: 54px;
         width: 2px;
         transform: translateX(-50%);
         background: linear-gradient(
@@ -46,7 +46,7 @@
         top: 14px;
       }
       .node-bot {
-        top: calc(100% - 14px);
+        top: calc(100% - 54px);
       }
       .r-entry {
         position: absolute;
@@ -177,7 +177,9 @@
       };
       const FIGHT_WINDOW = 60;
       const track = document.getElementById("track");
-      const posFor = (prog, h) => 14 + Math.max(0, Math.min(1, prog)) * (h - 28);
+      // 하단에 마커(아이콘+라벨) 들어갈 여유 54px 확보 → 도착 표시 안 잘림
+      const posFor = (prog, h) =>
+        14 + Math.max(0, Math.min(1, prog)) * (h - 68);
 
       const timers = new Map();
       function addRespawn({ championKey, name, totalSec }) {
