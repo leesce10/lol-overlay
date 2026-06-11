@@ -32,21 +32,31 @@ windows/
 icons/                     icon.png / icon_gray.png (아직 없음 — 추가 필요)
 ```
 
-## 검증 절차 (Windows에서)
+## Windows 설치 & 테스트 (load unpacked)
 
-1. **Overwolf 클라이언트 설치** + 개발자 계정.
-2. `icons/icon.png`, `icons/icon_gray.png` 추가 (매니페스트가 참조 — 없으면 로드 실패).
-3. Overwolf 설정 → **"개발자 옵션" 활성화** → **"Load unpacked extension"** 로 이 폴더 선택.
-4. League of Legends 한 판 시작.
+> Overwolf 앱은 독립 .exe가 아니라 **Overwolf 클라이언트 위에서** 돈다. 배포는 Overwolf 앱스토어 경유(QA 심사). 아래는 **본인 PC에서 심사 없이 바로 돌리는** 개발 설치.
+
+1. **Overwolf 설치** — https://www.overwolf.com (Windows 전용).
+2. **코드 받기** (Windows에서):
+   ```
+   git clone https://github.com/leesce10/lol-overlay.git
+   ```
+3. Overwolf 트레이 아이콘 우클릭 → **Settings → "Development" 탭** → **"Load unpacked extension"** → 클론한 `lol-overlay` 폴더 선택.
+   - 아이콘(`icons/`)은 이미 포함돼 있어 바로 로드된다.
+4. **League of Legends 한 판 시작** (사용자 지정 게임 또는 일반).
 5. 확인 포인트:
-   - 오버레이 창이 인게임에 뜨는가 (투명/클릭스루)
-   - 콘솔(`[bg]` 로그)에서 `setRequiredFeatures` 성공 + `all_players` 수신 여부
-   - 상대가 아이템 완성 시 토스트가 뜨는가
-6. UI만 빠르게 보려면: 브라우저로 `windows/overlay/overlay.html?demo=1` 열면 더미 토스트 1개 표시.
+   - **게임 시작 시 브리핑 패널 + 음성**이 뜨는가 (조합 게임플랜)
+   - 상대가 아이템 완성 시 **아이템 토스트**가 뜨는가
+   - Overwolf 개발자 도구 콘솔에서 `[bg]` 로그 — `setRequiredFeatures` 성공, `all_players`/`active_player` 수신, "브리핑 수신" 확인
+6. **문제 생기면** 콘솔 로그를 캡처해 공유 → 같이 디버깅. (이 코드는 Windows 미검증 상태라 첫 구동에서 수정이 필요할 수 있음)
+
+### UI만 빠르게 (Mac/브라우저 가능)
+- 브리핑: `windows/briefing/briefing.html?demo=1` — 실제 prod API 호출 + TTS
+- 아이템 토스트: `windows/overlay/overlay.html?demo=1` — 더미 토스트 1개
 
 ## 알려진 TODO / 미검증 지점
 
-- [ ] `icons/` 아이콘 파일 추가
+- [x] `icons/` 아이콘 파일 추가 (임시 단색 — 추후 정식 아이콘 교체)
 - [ ] `all_players` 아이템이 **완성 아이템만** vs 구성요소 포함인지 Windows에서 확인 → 노이즈면 완성템 필터
 - [ ] **내 맞라인만 필터링** (지금은 전체 플레이어 알림). `position`/`team`으로 매칭
 - [ ] Data Dragon 패치 버전 동적화 (`overlay.js`의 `DDRAGON_VERSION` 하드코딩)
