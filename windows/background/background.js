@@ -442,8 +442,8 @@ function updateRespawns(players) {
 // 스폰 스케줄(초, 추정). 처치 이벤트로 재스폰 계산.
 // 유충은 처치 이벤트가 없어 6:00 1회만(시간 기반으로 마커 정리). 용만 재스폰.
 const OBJ_SCHEDULE = [
-  { key: "grubs", label: "유충", first: 360, respawn: null }, // 6:00 1회(다중 스폰이라 재스폰 X)
-  { key: "herald", label: "전령", first: 840, respawn: null },
+  { key: "grubs", label: "유충", first: 480, respawn: null }, // 8:00 1회(다중 스폰이라 재스폰 X)
+  { key: "herald", label: "전령", first: 960, respawn: null }, // 16:00
   { key: "dragon", label: "드래곤", first: 300, respawn: 300 },
   { key: "baron", label: "바론", first: 1200, respawn: 360 },
 ];
@@ -532,11 +532,11 @@ function maybeFightTts(res, obj) {
   playTts(text);
 }
 
-// 유충은 처치 이벤트가 없어 시간 기반으로 마커 정리(스폰 6:00 → ~7:00 제거)
+// 유충은 처치 이벤트가 없어 시간 기반으로 마커 정리(스폰 8:00 → ~9:00 제거)
 let grubsCleared = false;
 function maybeClearGrubs() {
   if (grubsCleared) return;
-  if (latestGameTime >= 420) {
+  if (latestGameTime >= 540) {
     grubsCleared = true;
     if (timelineWinId) pushTimeline("fight-clear", { key: "grubs" });
   }
