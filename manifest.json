@@ -40,27 +40,16 @@
         "size": { "width": 380, "height": 460 },
         "start_position": { "top": 80, "left": 480 }
       },
-      "respawn": {
-        "file": "windows/respawn/respawn.html",
+      "timeline": {
+        "file": "windows/timeline/timeline.html",
         "transparent": true,
         "clickthrough": true,
         "topmost": true,
         "in_game_only": true,
         "resizable": false,
         "show_in_taskbar": false,
-        "size": { "width": 120, "height": 460 },
-        "start_position": { "top": 120, "left": 8 }
-      },
-      "fight": {
-        "file": "windows/fight/fight.html",
-        "transparent": true,
-        "clickthrough": true,
-        "topmost": true,
-        "in_game_only": true,
-        "resizable": false,
-        "show_in_taskbar": false,
-        "size": { "width": 220, "height": 460 },
-        "start_position": { "top": 110, "left": 150 }
+        "size": { "width": 240, "height": 600 },
+        "start_position": { "top": 90, "left": 8 }
       }
     },
     "game_targeting": {

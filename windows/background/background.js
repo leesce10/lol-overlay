@@ -195,7 +195,7 @@ function handleKillEvents(events) {
       Math.round(respawnSeconds(victim.level, latestGameTime)) +
       travelFor(victim.position);
     log("적 처치:", victim.championName, "복귀 예상", totalSec, "초");
-    openRespawn(() =>
+    openTimeline(() =>
       pushRespawn({
         championKey: championKeyOf(victim),
         name: victim.riotId || victim.summonerName,
@@ -205,25 +205,36 @@ function handleKillEvents(events) {
   }
 }
 
-let respawnWinId = null;
+// 복귀 + 오브젝트 교전을 하나의 timeline 창(세로선)에 통합
+let timelineWinId = null;
 
 // 분수대 → 라인 걸어오는 추정 시간(초). 라인마다 거리가 달라 다르게 잡음.
-// (이동속도·군화 등 변수라 추정값 — 필요 시 숫자만 조정)
 function travelFor(position) {
   const t = { MIDDLE: 11, JUNGLE: 13, TOP: 17, BOTTOM: 17, UTILITY: 16 };
   return t[(position || "").toUpperCase()] || 15;
 }
 
-function openRespawn(cb) {
-  if (respawnWinId) {
+function openTimeline(cb) {
+  if (timelineWinId) {
     cb && cb();
     return;
   }
-  overwolf.windows.obtainDeclaredWindow("respawn", (res) => {
-    if (!res.success) return log("respawn 창 obtain 실패", res);
-    respawnWinId = res.window.id;
-    overwolf.windows.restore(respawnWinId, () => cb && cb());
+  overwolf.windows.obtainDeclaredWindow("timeline", (res) => {
+    if (!res.success) return log("timeline 창 obtain 실패", res);
+    timelineWinId = res.window.id;
+    overwolf.windows.restore(timelineWinId, () => cb && cb());
   });
+}
+
+function pushTimeline(id, content) {
+  if (timelineWinId)
+    overwolf.windows.sendMessage(timelineWinId, id, content, () => {});
+}
+function pushRespawn(payload) {
+  pushTimeline("respawn-add", payload);
+}
+function pushFight(payload) {
+  pushTimeline("fight-update", payload);
 }
 
 // all_players의 실제 respawnTimer로 매 스냅샷 보정 (공식 추정보다 정확)
@@ -233,7 +244,7 @@ function updateRespawns(players) {
     if (!p.team || p.team === mySide) continue; // 적만
     if (p.isDead && p.respawnTimer > 0) {
       const name = p.riotId || p.summonerName;
-      openRespawn(() =>
+      openTimeline(() =>
         pushRespawn({
           championKey: championKeyOf(p),
           name,
@@ -242,12 +253,6 @@ function updateRespawns(players) {
         })
       );
     }
-  }
-}
-
-function pushRespawn(payload) {
-  if (respawnWinId) {
-    overwolf.windows.sendMessage(respawnWinId, "respawn-add", payload, () => {});
   }
 }
 
@@ -310,7 +315,7 @@ function maybeFightAnalysis() {
     .then((r) => r.json())
     .then((res) => {
       log("교전 분석:", obj.label, res.verdict);
-      openFight(() =>
+      openTimeline(() =>
         pushFight({
           key: obj.key,
           objective: obj.label,
@@ -321,22 +326,6 @@ function maybeFightAnalysis() {
       );
     })
     .catch((e) => log("교전 분석 실패", e));
-}
-
-let fightWinId = null;
-
-function openFight(cb) {
-  overwolf.windows.obtainDeclaredWindow("fight", (res) => {
-    if (!res.success) return log("fight 창 obtain 실패", res);
-    fightWinId = res.window.id;
-    overwolf.windows.restore(fightWinId, () => cb && cb());
-  });
-}
-
-function pushFight(payload) {
-  if (fightWinId) {
-    overwolf.windows.sendMessage(fightWinId, "fight-update", payload, () => {});
-  }
 }
 
 // ---- 게임 시작 조합 브리핑 ------------------------------------------------
@@ -530,8 +519,8 @@ let overlayId = null;
 
 const OVERLAY_W = 460;
 const OVERLAY_H = 200;
-// 화면 하단에서 토스트 아래 가장자리까지 거리(px). 클수록 더 위로. (스킬창 안 겹치게)
-const SKILL_CLEARANCE = 360;
+// 화면 하단에서 토스트 아래 가장자리까지 거리(px). 클수록 더 위로. (스킬창 조금 위)
+const SKILL_CLEARANCE = 180;
 
 function openOverlay() {
   overwolf.windows.obtainDeclaredWindow("overlay", (res) => {
