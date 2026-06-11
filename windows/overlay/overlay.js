@@ -35,12 +35,14 @@ function showToast({ championName, itemName, itemID, team }) {
   setTimeout(() => el.remove(), 5000);
 }
 
-// background → overlay 메시지 수신
-overwolf.windows.onMessageReceived.addListener((msg) => {
-  if (msg.id === "new-item" && msg.content) {
-    showToast(msg.content);
-  }
-});
+// background → overlay 메시지 수신 (Overwolf 런타임에서만)
+if (typeof overwolf !== "undefined") {
+  overwolf.windows.onMessageReceived.addListener((msg) => {
+    if (msg.id === "new-item" && msg.content) {
+      showToast(msg.content);
+    }
+  });
+}
 
 // 개발용: ?demo=1 로 열면 더미 토스트 한 번 표시 (브라우저에서도 확인 가능)
 if (location.search.includes("demo")) {
