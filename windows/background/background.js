@@ -80,7 +80,10 @@ overwolf.games.events.onInfoUpdates2.addListener((info) => {
   if (lcd.game_data) {
     try {
       const gd = JSON.parse(lcd.game_data);
-      if (typeof gd.gameTime === "number") latestGameTime = gd.gameTime;
+      if (typeof gd.gameTime === "number") {
+        latestGameTime = gd.gameTime;
+        maybeFightAnalysis();
+      }
     } catch (e) {
       /* ignore */
     }
@@ -116,6 +119,8 @@ overwolf.games.events.onInfoUpdates2.addListener((info) => {
 let latestPlayers = [];
 let latestGameTime = 0;
 const processedKills = new Set();
+const objectiveKills = {}; // { dragon: killTime, ... }
+let lastFightFetch = 0;
 
 // 부활 대기시간(초): 레벨별 기본값 × (1 + 시간증가계수). 레벨·게임시간은 화면에 보임.
 function respawnSeconds(level, gameSec) {
@@ -129,11 +134,30 @@ function respawnSeconds(level, gameSec) {
   return BRW[lvl - 1] * (1 + tif);
 }
 
+const OBJ_EVENT = {
+  DragonKill: "dragon",
+  BaronKill: "baron",
+  HeraldKill: "herald",
+  HordeKill: "grubs",
+};
+
 function handleKillEvents(events) {
   const mySide = myTeamSide(latestPlayers);
   for (const ev of events) {
-    if (ev.EventName !== "ChampionKill") continue;
     const key = `${ev.EventID}-${ev.EventName}`;
+
+    // 오브젝트 처치 → 재스폰 계산용 기록
+    const objKey = OBJ_EVENT[ev.EventName];
+    if (objKey) {
+      if (!processedKills.has(key)) {
+        processedKills.add(key);
+        objectiveKills[objKey] = ev.EventTime;
+        log("오브젝트 처치:", objKey, "@", Math.round(ev.EventTime));
+      }
+      continue;
+    }
+
+    if (ev.EventName !== "ChampionKill") continue;
     if (processedKills.has(key)) continue;
     processedKills.add(key);
 
@@ -169,6 +193,93 @@ function openRespawn(cb) {
 function pushRespawn(payload) {
   if (respawnWinId) {
     overwolf.windows.sendMessage(respawnWinId, "respawn-add", payload, () => {});
+  }
+}
+
+// ---- 오브젝트 교전 분석 ---------------------------------------------------
+// 스폰 스케줄(초, 추정). 처치 이벤트로 재스폰 계산.
+const OBJ_SCHEDULE = [
+  { key: "grubs", label: "유충", first: 360, respawn: null },
+  { key: "herald", label: "전령", first: 840, respawn: null },
+  { key: "dragon", label: "드래곤", first: 300, respawn: 300 },
+  { key: "baron", label: "바론", first: 1200, respawn: 360 },
+];
+
+function objectivesInWindow(gameTime, win) {
+  const out = [];
+  for (const d of OBJ_SCHEDULE) {
+    const killed = objectiveKills[d.key];
+    let spawnAt;
+    if (killed == null) spawnAt = d.first;
+    else if (d.respawn != null) spawnAt = killed + d.respawn;
+    else continue;
+    const secondsTo = Math.round(spawnAt - gameTime);
+    if (secondsTo <= win && secondsTo > -20)
+      out.push({ key: d.key, label: d.label, secondsTo });
+  }
+  return out.sort((a, b) => a.secondsTo - b.secondsTo);
+}
+
+// 스폰 60초 전부터, 8초마다 교전 분석 갱신
+function maybeFightAnalysis() {
+  if (!latestPlayers.length) return;
+  const upcoming = objectivesInWindow(latestGameTime, 60);
+  if (!upcoming.length) return;
+
+  const now = Date.now();
+  if (now - lastFightFetch < 8000) return; // 스로틀
+  lastFightFetch = now;
+
+  const obj = upcoming[0];
+  const mySide = myTeamSide(latestPlayers);
+  const myTeamId = mySide === "CHAOS" ? 200 : 100;
+  const players = latestPlayers.map((p) => ({
+    teamId: p.team === "CHAOS" ? 200 : 100,
+    level: p.level,
+    items: (p.items || []).map((it) => it.itemID),
+    isDead: !!p.isDead,
+    respawnTimer: p.respawnTimer || 0,
+  }));
+
+  fetch(window.LOLSTATS.API_BASE + "/api/live/fight-analysis", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      secondsToObjective: Math.max(0, obj.secondsTo),
+      gameTime: latestGameTime,
+      myTeamId,
+      objective: obj.label,
+      players,
+    }),
+  })
+    .then((r) => r.json())
+    .then((res) => {
+      log("교전 분석:", obj.label, res.verdict);
+      openFight(() =>
+        pushFight({
+          objective: obj.label,
+          verdict: res.verdict,
+          reason: res.reason,
+          secondsTo: obj.secondsTo,
+        })
+      );
+    })
+    .catch((e) => log("교전 분석 실패", e));
+}
+
+let fightWinId = null;
+
+function openFight(cb) {
+  overwolf.windows.obtainDeclaredWindow("fight", (res) => {
+    if (!res.success) return log("fight 창 obtain 실패", res);
+    fightWinId = res.window.id;
+    overwolf.windows.restore(fightWinId, () => cb && cb());
+  });
+}
+
+function pushFight(payload) {
+  if (fightWinId) {
+    overwolf.windows.sendMessage(fightWinId, "fight-update", payload, () => {});
   }
 }
 

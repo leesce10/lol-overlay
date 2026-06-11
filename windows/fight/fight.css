@@ -1,0 +1,78 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: "Pretendard", "Malgun Gothic", sans-serif;
+  -webkit-user-select: none;
+}
+
+#card {
+  margin: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(10, 12, 18, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #eef2ff;
+}
+#card.hidden {
+  display: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.obj {
+  font-size: 13px;
+  font-weight: 700;
+}
+.verdict {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.verdict.veryGood {
+  background: rgba(16, 185, 129, 0.3);
+  color: #a7f3d0;
+  border-color: #34d399;
+}
+.verdict.good {
+  background: rgba(34, 197, 94, 0.25);
+  color: #bbf7d0;
+  border-color: rgba(74, 222, 128, 0.6);
+}
+.verdict.even {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.verdict.bad {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.6);
+}
+.verdict.veryBad {
+  background: rgba(244, 63, 94, 0.3);
+  color: #fecaca;
+  border-color: #fb7185;
+}
+
+.reason {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: #aab3cc;
+  line-height: 1.35;
+}
+.spawn {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #7b86a8;
+}
