@@ -5,10 +5,12 @@
 const DDRAGON_VERSION = "15.1.1";
 const ITEM_ICON = (id) =>
   `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/item/${id}.png`;
+const CHAMP_ICON = (key) =>
+  `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/champion/${key}.png`;
 
 const toasts = document.getElementById("toasts");
 
-function showToast({ championName, itemName, itemID }) {
+function showToast({ championKey, itemName, itemID }) {
   const el = document.createElement("div");
   el.className = "toast";
 
@@ -16,19 +18,29 @@ function showToast({ championName, itemName, itemID }) {
   badge.className = "enemy-badge";
   badge.textContent = "적";
 
-  const img = document.createElement("img");
-  img.src = ITEM_ICON(itemID);
-  img.onerror = () => {
-    img.style.visibility = "hidden";
+  // 챔피언 아이콘 ("적" 옆)
+  const champImg = document.createElement("img");
+  champImg.className = "champ";
+  if (championKey) champImg.src = CHAMP_ICON(championKey);
+  champImg.onerror = () => {
+    champImg.style.display = "none";
+  };
+
+  // 아이템 아이콘
+  const itemImg = document.createElement("img");
+  itemImg.className = "item";
+  itemImg.src = ITEM_ICON(itemID);
+  itemImg.onerror = () => {
+    itemImg.style.visibility = "hidden";
   };
 
   const text = document.createElement("div");
   text.className = "text";
-  const who = championName || "상대";
-  text.innerHTML = `<b>${who}</b> 구매<br/>${itemName}`;
+  text.innerHTML = `<b>${itemName}</b> 구매`;
 
   el.appendChild(badge);
-  el.appendChild(img);
+  el.appendChild(champImg);
+  el.appendChild(itemImg);
   el.appendChild(text);
   toasts.appendChild(el);
 
@@ -48,9 +60,8 @@ if (typeof overwolf !== "undefined") {
 // 개발용: ?demo=1 로 열면 더미 토스트 한 번 표시 (브라우저에서도 확인 가능)
 if (location.search.includes("demo")) {
   showToast({
-    championName: "Ahri",
+    championKey: "Ahri",
     itemName: "존야의 모래시계",
     itemID: 3157,
-    team: "CHAOS",
   });
 }

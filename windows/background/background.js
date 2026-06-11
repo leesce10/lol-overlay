@@ -203,6 +203,7 @@ function detectNewItems(players) {
         if (meta && meta.consumable) return; // 포션/와드 등 소비템 제외(노이즈)
         notifyOverlay({
           championName: p.championName,
+          championKey: championKeyOf(p), // DDragon 아이콘용 (예: "Zed")
           itemID,
           itemName: meta ? meta.displayName : String(itemID),
         });
