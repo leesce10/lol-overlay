@@ -261,11 +261,12 @@ function handleKillEvents(events) {
       continue;
     }
     if (!victim.team || victim.team === mySide) continue; // 적만
+    if (latestGameTime >= LANE_PHASE_END) continue; // 라인전 끝나면 복귀 UI 끔
 
     // 부활 시간 + 라인복귀 이동. 곧 all_players의 실제 respawnTimer로 보정됨.
     const totalSec =
       Math.round(respawnSeconds(victim.level, latestGameTime)) +
-      travelFor(latestGameTime);
+      travelFor(latestGameTime, victim.position);
     log("적 처치:", victim.championName, "복귀", totalSec, "초");
     openTimeline(() =>
       pushRespawn({
@@ -281,13 +282,16 @@ function handleKillEvents(events) {
 let timelineWinId = null;
 
 // 분수대 → 라인 걸어오는 추정 시간(초). 라인마다 거리가 달라 다르게 잡음.
-// 분수대→라인 이동(초). 게임이 진행될수록 군화/이속으로 짧아짐.
-function travelFor(gameSec) {
+// 분수대→라인 이동(초). 게임 진행될수록 군화/이속으로 짧아짐. 탑/바텀은 더 멀어 +4.
+function travelFor(gameSec, position) {
   const min = (gameSec || 0) / 60;
-  if (min < 8) return 15; // 초반
-  if (min < 20) return 13; // 중반
-  return 12; // 후반
+  let t = min < 8 ? 15 : min < 20 ? 13 : 12;
+  const pos = (position || "").toUpperCase();
+  if (pos === "TOP" || pos === "BOTTOM") t += 4;
+  return t;
 }
+
+const LANE_PHASE_END = 1200; // 20분 — 이후 라인복귀 UI 비활성화
 
 function openTimeline(cb) {
   if (timelineWinId) {
@@ -338,6 +342,7 @@ function deathCount(p) {
   return (p.scores && (p.scores.deaths ?? p.scores.death)) || 0;
 }
 function updateRespawns(players) {
+  if (latestGameTime >= LANE_PHASE_END) return; // 라인전 끝나면 복귀 UI 끔
   const mySide = myTeamSide(players);
   for (const p of players) {
     if (!p.team || p.team === mySide) continue; // 적만
@@ -360,7 +365,7 @@ function updateRespawns(players) {
       const respawn = hasTimer
         ? Math.ceil(p.respawnTimer)
         : Math.round(respawnSeconds(p.level, latestGameTime));
-      const totalSec = respawn + travelFor(latestGameTime);
+      const totalSec = respawn + travelFor(latestGameTime, p.position);
       openTimeline(() =>
         pushRespawn({ championKey: championKeyOf(p), name, totalSec })
       );

@@ -56,13 +56,24 @@
         flex-direction: column;
         align-items: center;
       }
-      .r-entry img {
+      .r-entry img,
+      .r-entry .champ-fallback {
         width: 44px;
         height: 44px;
         max-width: none;
         border-radius: 50%;
         border: 2px solid rgba(230, 70, 70, 0.85);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+        box-sizing: border-box;
+      }
+      .r-entry .champ-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(40, 20, 20, 0.9);
+        color: #ffd1d1;
+        font-size: 15px;
+        font-weight: 700;
       }
       .r-entry.back img {
         border-color: #4ade80;
@@ -191,7 +202,13 @@
           el.className = "r-entry";
           const img = document.createElement("img");
           img.src = CHAMP(championKey);
-          img.onerror = () => (img.style.visibility = "hidden");
+          // 아이콘 로드 실패(키 불일치 등) → 이니셜 동그라미로 대체 (안 사라지게)
+          img.onerror = () => {
+            const fb = document.createElement("div");
+            fb.className = "champ-fallback";
+            fb.textContent = (championKey || "?").slice(0, 2);
+            img.replaceWith(fb);
+          };
           const sec = document.createElement("div");
           sec.className = "sec";
           el.appendChild(img);
