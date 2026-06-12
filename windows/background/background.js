@@ -527,25 +527,29 @@ function verdictPhrase(v) {
   }
 }
 
-// 판정의 지배 요인 하나를 자연스러운 말로
+// 판정의 지배 요인 하나를 핵심 숫자와 함께 자연스러운 말로
 function fightReasonSpoken(res) {
   const nd = res.numbersDiff || 0;
   if (nd >= 1) {
     const late = res.enemy && res.enemy.lateReturns;
     if (late) return `적 ${late}명이 아직 복귀하지 못했어요.`;
-    return "한타 인원이 우리가 더 많아요.";
+    return `한타 인원이 ${Math.round(nd)}명 더 많아요.`;
   }
   if (nd <= -1) {
     const late = res.my && res.my.lateReturns;
     if (late) return `아군 ${late}명이 제때 복귀하지 못해요.`;
-    return "한타 인원이 상대가 더 많아요.";
+    return `한타 인원이 ${Math.round(-nd)}명 부족해요.`;
   }
   const ld = res.avgLevelDiff || 0;
   if (Math.abs(ld) >= 0.5)
-    return ld > 0 ? "평균 레벨이 우리가 앞서요." : "평균 레벨이 상대가 앞서요.";
+    return ld > 0
+      ? `평균 레벨이 ${ld.toFixed(1)} 앞서요.`
+      : `평균 레벨이 ${(-ld).toFixed(1)} 뒤져요.`;
   const gd = res.goldDiff || 0;
-  if (Math.abs(gd) >= 800)
-    return gd > 0 ? "아이템이 우리가 더 좋아요." : "아이템이 상대가 더 좋아요.";
+  if (Math.abs(gd) >= 800) {
+    const amount = Math.round(Math.abs(gd) / 100) * 100; // 100단위 반올림
+    return gd > 0 ? `아이템 골드 ${amount} 앞서요.` : `아이템 골드 ${amount} 뒤져요.`;
+  }
   return "양 팀 전력이 비슷해요.";
 }
 
@@ -630,6 +634,13 @@ function maybeFightAnalysis() {
             verdict: res.verdict,
             reason: res.reason,
             secondsTo: obj.secondsTo,
+            // 숫자 근거(이미 계산됨) — 타임라인 카드에 표시
+            myEff: res.my && res.my.effective,
+            enemyEff: res.enemy && res.enemy.effective,
+            myLate: res.my && res.my.lateReturns,
+            enemyLate: res.enemy && res.enemy.lateReturns,
+            levelDiff: res.avgLevelDiff,
+            goldDiff: res.goldDiff,
           })
         );
         maybeFightTts(res, obj);

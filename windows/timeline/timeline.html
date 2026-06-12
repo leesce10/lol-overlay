@@ -134,6 +134,41 @@
       .f-marker.spawned .f-sec {
         display: none;
       }
+      /* 교전 숫자 근거 패널 (아이콘 우측, 판정 칩 아래) */
+      .f-stats {
+        position: absolute;
+        left: 52px;
+        top: 44px;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        white-space: nowrap;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.25;
+        text-shadow: 0 1px 3px #000, 0 0 4px #000;
+      }
+      .f-stats .row {
+        display: flex;
+        gap: 5px;
+      }
+      .f-stats .lbl {
+        color: #aeb6c8;
+        font-weight: 600;
+      }
+      .f-stats .pos {
+        color: #7ef0b0;
+      }
+      .f-stats .neg {
+        color: #ff9f9f;
+      }
+      .f-stats .neu {
+        color: #c8cfe0;
+      }
+      .f-stats .act {
+        margin-top: 2px;
+        font-weight: 800;
+      }
       .verdict {
         position: absolute;
         left: 54px;
@@ -255,13 +290,42 @@
         const el = document.createElement("div");
         el.className = "f-marker";
         el.innerHTML =
-          '<img class="fimg" alt="" /><span class="verdict"></span><div class="f-name"></div><div class="f-sec"></div>';
+          '<img class="fimg" alt="" /><span class="verdict"></span><div class="f-name"></div><div class="f-sec"></div><div class="f-stats"></div>';
         track.appendChild(el);
         f = { el, key, dir: GROUP_OF[key] || "down" };
         fights.set(key, f);
         return f;
       }
-      function updateFight({ key, objective, verdict, secondsTo }) {
+      // verdict별 행동 지시
+      const ACTION = {
+        "매우 유리": "지금 강하게 들어가세요",
+        유리: "시야 잡고 시작하세요",
+        호각: "신중하게, 무리 금지",
+        불리: "지금은 피하세요",
+        "매우 불리": "절대 싸우지 마세요",
+      };
+      function fmtLevel(d) {
+        if (Math.abs(d) < 0.3) return { t: "0", c: "neu" };
+        return { t: (d > 0 ? "+" : "-") + Math.abs(d).toFixed(1), c: d > 0 ? "pos" : "neg" };
+      }
+      function fmtGold(d) {
+        if (Math.abs(d) < 300) return { t: "0", c: "neu" };
+        const a = Math.abs(d);
+        const num = a >= 1000 ? Math.round(a / 100) / 10 + "k" : String(Math.round(a / 100) * 100);
+        return { t: (d > 0 ? "+" : "-") + num, c: d > 0 ? "pos" : "neg" };
+      }
+      function fmtPeople(myEff, enemyEff, myLate, enemyLate) {
+        const m = Math.round(myEff || 0);
+        const e = Math.round(enemyEff || 0);
+        let tail = "";
+        if (enemyLate) tail = `(적${enemyLate} 복귀✗)`;
+        else if (myLate) tail = `(아군${myLate} 복귀✗)`;
+        return { t: `${m} : ${e}`, c: m > e ? "pos" : m < e ? "neg" : "neu", tail };
+      }
+      function updateFight({
+        key, objective, verdict, secondsTo,
+        myEff, enemyEff, myLate, enemyLate, levelDiff, goldDiff,
+      }) {
         const f = ensureFightEl(key);
         const img = f.el.querySelector(".fimg");
         img.src = OBJ_ICON[key] || OBJ_ICON.dragon;
@@ -272,6 +336,29 @@
         f.el.querySelector(".f-name").textContent = objective || "";
         f.spawnAt = Date.now() + Math.max(0, secondsTo) * 1000;
         f.el.classList.remove("hidden");
+
+        // 숫자 근거 패널
+        const stats = f.el.querySelector(".f-stats");
+        const hasNums = [myEff, enemyEff, levelDiff, goldDiff].some(
+          (x) => typeof x === "number"
+        );
+        if (!hasNums) {
+          stats.innerHTML = "";
+          stats.style.display = "none";
+        } else {
+          const ppl = fmtPeople(myEff, enemyEff, myLate, enemyLate);
+          const lv = fmtLevel(levelDiff || 0);
+          const gd = fmtGold(goldDiff || 0);
+          const actC = /유리/.test(verdict) ? "pos" : /불리/.test(verdict) ? "neg" : "neu";
+          stats.style.display = "flex";
+          stats.innerHTML =
+            `<div class="row"><span class="lbl">인원</span><span class="${ppl.c}">${ppl.t}</span>` +
+            (ppl.tail ? `<span class="lbl">${ppl.tail}</span>` : "") +
+            `</div>` +
+            `<div class="row"><span class="lbl">레벨</span><span class="${lv.c}">${lv.t}</span></div>` +
+            `<div class="row"><span class="lbl">템골드</span><span class="${gd.c}">${gd.t}</span></div>` +
+            `<div class="act ${actC}">${ACTION[verdict] || ""}</div>`;
+        }
       }
       function clearFight(key) {
         const f = fights.get(key);
@@ -359,12 +446,14 @@
             objective: "바론",
             verdict: "매우 유리",
             secondsTo: 50,
+            myEff: 5, enemyEff: 4, enemyLate: 1, levelDiff: 1.0, goldDiff: 2400,
           });
           updateFight({
             key: "dragon",
             objective: "드래곤",
             verdict: "불리",
             secondsTo: 40,
+            myEff: 4, enemyEff: 5, myLate: 1, levelDiff: -0.6, goldDiff: -1500,
           });
         }
       }
