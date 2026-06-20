@@ -1,0 +1,40 @@
+name: Build Windows installer
+
+# 수동 실행(Run workflow 버튼) 또는 v* 태그 푸시 시 .exe 빌드 → Release 발행
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # Release 생성/업데이트에 필요
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        working-directory: electron
+        run: npm ci
+
+      - name: Build (.exe)
+        working-directory: electron
+        run: npm run dist
+
+      - name: Publish to Release (release-latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-latest
+          name: LoL Overlay (latest)
+          body: |
+            인게임 오버레이 최신 빌드 (Overwolf 불필요).
+            아래 LoL-Overlay-Setup.exe 다운로드 → 실행. 롤은 테두리없음/창 모드 권장.
+          files: electron/dist/LoL-Overlay-Setup.exe
+          fail_on_unmatched_files: true

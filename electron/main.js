@@ -11,11 +11,11 @@ const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } =
 const path = require("path");
 const https = require("https");
 
-const WIN = path.join(__dirname, "..", "windows");
-const OVERLAY_HTML = path.join(WIN, "overlay", "overlay.html");
-const TIMELINE_HTML = path.join(WIN, "timeline", "timeline.html");
+// UI/아이콘은 sync-ui.js가 빌드 전에 electron/ 안으로 복사(.exe 자체 포함)
+const OVERLAY_HTML = path.join(__dirname, "ui", "overlay.html");
+const TIMELINE_HTML = path.join(__dirname, "ui", "timeline.html");
 const ENGINE_HTML = path.join(__dirname, "engine.html");
-const ICON = path.join(__dirname, "..", "icons", "icon.png");
+const ICON = path.join(__dirname, "icon.png");
 
 // 오버레이 크기/배치 상수 (Overwolf 버전과 동일)
 const OVERLAY_W = 760, OVERLAY_H = 220, SKILL_CLEARANCE = 480;

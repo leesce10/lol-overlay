@@ -5,7 +5,9 @@
   "author": "lol-stats",
   "main": "main.js",
   "scripts": {
+    "prestart": "node sync-ui.js",
     "start": "electron .",
+    "predist": "node sync-ui.js",
     "dist": "electron-builder --win --x64"
   },
   "devDependencies": {
@@ -15,22 +17,23 @@
   "build": {
     "appId": "gg.lolstats.overlay",
     "productName": "LoL Overlay",
+    "artifactName": "LoL-Overlay-Setup.${ext}",
     "files": [
       "main.js",
       "preload-engine.js",
       "preload-overlay.js",
       "engine.html",
       "engine.js",
-      "../windows/**/*",
-      "../icons/**/*"
+      "ui/**/*",
+      "icon.png"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "../icons/icon.png"
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": true,
-      "perMachine": false
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
     }
   }
 }
