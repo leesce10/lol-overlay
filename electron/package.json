@@ -1,0 +1,36 @@
+{
+  "name": "lol-overlay-electron",
+  "version": "0.1.0",
+  "description": "LoL 인게임 오버레이 (Electron) — Riot Live Client Data 기반. Overwolf 불필요.",
+  "author": "lol-stats",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "gg.lolstats.overlay",
+    "productName": "LoL Overlay",
+    "files": [
+      "main.js",
+      "preload-engine.js",
+      "preload-overlay.js",
+      "engine.html",
+      "engine.js",
+      "../windows/**/*",
+      "../icons/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "../icons/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    }
+  }
+}
