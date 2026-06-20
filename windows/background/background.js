@@ -12,8 +12,8 @@ const REQUIRED_FEATURES = ["live_client_data"];
 // 테스트용 가짜 알림 (실서비스에선 false). 실제 동작만 사용.
 const DEBUG_FAKE_CORE_ITEM = false;
 
-// 진단: 화면에 데이터 수신 상태 표시 (문제 해결돼서 끔)
-const DEBUG_STATUS = false;
+// 진단: 화면에 데이터 수신 상태 표시 (버전업 후 동작 점검용으로 임시 ON)
+const DEBUG_STATUS = true;
 let dbgFeat = "?",
   dbgUpd = 0,
   dbgLcd = 0,
