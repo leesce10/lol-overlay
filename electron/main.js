@@ -10,6 +10,7 @@ const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } =
   require("electron");
 const path = require("path");
 const https = require("https");
+const { autoUpdater } = require("electron-updater");
 
 // UI/아이콘은 sync-ui.js가 빌드 전에 electron/ 안으로 복사(.exe 자체 포함)
 const OVERLAY_HTML = path.join(__dirname, "ui", "overlay.html");
@@ -178,24 +179,95 @@ ipcMain.on("ui-message", (_e, { target, id, content }) => {
   if (w && !w.isDestroyed()) w.webContents.send("msg", { id, content });
 });
 
-// ---- 트레이 (종료용) ------------------------------------------------------
+// ---- 자동 업데이트 (GitHub Release) ---------------------------------------
+// idle | checking | available | downloading | downloaded | latest | error
+let updateStatus = "idle";
+let updateError = "";
+
+function setUpdateStatus(s, err) {
+  updateStatus = s;
+  updateError = err || "";
+  rebuildTray();
+}
+
+function setupUpdater() {
+  autoUpdater.autoDownload = true; // 백그라운드에서 받아둠
+  autoUpdater.autoInstallOnAppQuit = true; // 종료 시 자동 설치
+  autoUpdater.on("checking-for-update", () => setUpdateStatus("checking"));
+  autoUpdater.on("update-available", () => setUpdateStatus("downloading"));
+  autoUpdater.on("update-not-available", () => setUpdateStatus("latest"));
+  autoUpdater.on("download-progress", () => {
+    if (updateStatus !== "downloading") setUpdateStatus("downloading");
+  });
+  autoUpdater.on("update-downloaded", () => setUpdateStatus("downloaded"));
+  autoUpdater.on("error", (e) => setUpdateStatus("error", e && e.message));
+}
+
+function checkForUpdates() {
+  if (!app.isPackaged) {
+    setUpdateStatus("error", "개발 모드에서는 업데이트 확인 불가");
+    return;
+  }
+  setUpdateStatus("checking");
+  autoUpdater.checkForUpdates().catch((e) => setUpdateStatus("error", e && e.message));
+}
+
+// ---- 트레이 (업데이트 + 종료) ---------------------------------------------
+
+function updateMenuItem() {
+  switch (updateStatus) {
+    case "checking":
+      return { label: "업데이트 확인 중…", enabled: false };
+    case "downloading":
+      return { label: "업데이트 다운로드 중…", enabled: false };
+    case "downloaded":
+      return {
+        label: "✅ 업데이트 설치하고 재시작",
+        click: () => {
+          isQuitting = true;
+          autoUpdater.quitAndInstall();
+        },
+      };
+    case "latest":
+      return { label: "최신 버전입니다 (다시 확인)", click: checkForUpdates };
+    case "error":
+      return { label: "업데이트 확인 실패 (다시 시도)", click: checkForUpdates };
+    default:
+      return { label: "업데이트 확인", click: checkForUpdates };
+  }
+}
+
+function rebuildTray() {
+  if (!tray) return;
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: `LoL Overlay v${app.getVersion()}${updateStatus === "downloaded" ? " (업데이트 준비됨)" : ""}`,
+        enabled: false,
+      },
+      { type: "separator" },
+      updateMenuItem(),
+      { type: "separator" },
+      { label: "종료", click: () => app.quit() },
+    ])
+  );
+  tray.setToolTip(
+    updateStatus === "downloaded"
+      ? "LoL Overlay — 업데이트 준비됨 (트레이에서 설치)"
+      : "LoL Overlay (lol-stats)"
+  );
+}
 
 function makeTray() {
   let img = nativeImage.createFromPath(ICON);
   if (img.isEmpty()) img = nativeImage.createEmpty();
   tray = new Tray(img);
-  tray.setToolTip("LoL Overlay (lol-stats)");
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: "LoL Overlay 실행 중 (게임 감지 시 표시)", enabled: false },
-      { type: "separator" },
-      { label: "종료", click: () => app.quit() },
-    ])
-  );
+  rebuildTray();
 }
 
 // ---- 앱 시작 --------------------------------------------------------------
 
+let isQuitting = false;
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -207,6 +279,8 @@ if (!gotLock) {
     timelineWin = makeClickThroughWindow(TIMELINE_HTML, TIMELINE_W, TIMELINE_H);
     makeTray();
     setInterval(pollLcd, 1000);
+    setupUpdater();
+    if (app.isPackaged) checkForUpdates(); // 시작 시 1회 자동 확인
     console.log("[main] LoL Overlay 시작 — 게임 대기 중");
   });
 
