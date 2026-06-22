@@ -10,8 +10,9 @@ const engineAPI = window.engineAPI; // preload-engine.js가 노출
 // 디버그 카운터(로깅용으로만 유지)
 let dbgDeaths = 0;
 
-// 플레이어별 이전 아이템 집합 (name -> Set<itemID>)
+// 플레이어별(팀:챔프 안정키) 본 아이템 합집합 + 직전 시야 여부
 const prevItems = new Map();
+const prevVisible = new Map();
 
 function log(...args) {
   console.log("[engine]", ...args);
@@ -24,6 +25,7 @@ let activeSummoner = null; // 내 소환사명 (active_player)
 // 게임 종료 시 상태 초기화(다음 판 깨끗하게)
 function resetState() {
   prevItems.clear();
+  prevVisible.clear();
   prevDeaths.clear();
   processedKills.clear();
   for (const k in objectiveKills) delete objectiveKills[k];
@@ -647,18 +649,24 @@ function detectNewItems(players) {
   const mySide = myTeamSide(players);
 
   players.forEach((p) => {
-    const name = p.riotId || p.summonerName || p.championName || "unknown";
+    const isEnemy = p.team && p.team !== mySide;
+    // 안정 키(팀:챔프) — riotId/소환사명이 스냅샷마다 흔들려도 안 바뀜(중복 알림 방지)
+    const key = `${p.team || "?"}:${championKeyOf(p) || p.riotId || p.summonerName || "?"}`;
     const allItems = p.items || [];
     const ids = allItems.map((it) => it.itemID);
-    // 시야 밖이면 목록이 비거나 줄어듦 → 기록 축소 금지(빈 스냅샷은 무시)
-    if (!ids.length) return;
 
-    const seen = prevItems.get(name); // 지금까지 본 아이템 합집합(절대 축소 안 함)
-    const isEnemy = p.team && p.team !== mySide;
+    // 시야 밖이면 목록이 비거나 줄어듦 → 기록 축소 금지 + "직전에 안 보였음" 표시
+    if (!ids.length) {
+      prevVisible.set(key, false);
+      return;
+    }
+    const wasVisible = prevVisible.get(key) === true;
+    prevVisible.set(key, true);
 
+    const seen = prevItems.get(key); // 지금까지 본 아이템 합집합(절대 축소 안 함)
     // 첫 관측: 기존/시작 아이템은 알리지 않고 기록만
     if (!seen) {
-      prevItems.set(name, new Set(ids));
+      prevItems.set(key, new Set(ids));
       return;
     }
 
@@ -666,6 +674,8 @@ function detectNewItems(players) {
       if (seen.has(itemID)) return; // 이미 본 아이템(중복 알림 방지)
       seen.add(itemID); // 봤다고 기록 → 같은 아이템 다신 안 울림
       if (!isEnemy) return; // 적만 알림
+      // 방금 시야로 (다시) 들어온 경우: 그동안 산 아이템 따라잡기 → 알림 안 함(한꺼번에 폭발 방지)
+      if (!wasVisible) return;
       const meta = allItems.find((it) => it.itemID === itemID);
       if (meta && meta.consumable) return; // 포션/와드 등 소비템 제외
       const core = !!(coreItemIds && coreItemIds.has(itemID));
@@ -696,7 +706,11 @@ function notifyOverlay(payload) {
 // ---- main(IPC) 연동 -------------------------------------------------------
 
 engineAPI.onGameStart(() => {
-  log("게임 시작 감지 → 코어 아이템 로드");
+  log("게임 시작 감지 → 상태/마커 초기화 + 코어 아이템 로드");
+  // 이전 게임/세션의 잔여 마커(바론·용·복귀 등) 제거 — 창이 세션 내내 유지되므로 필수
+  resetState();
+  engineAPI.sendUi("timeline", "reset", { v: 1 });
+  engineAPI.sendUi("overlay", "reset", { v: 1 });
   loadCoreItems();
 });
 engineAPI.onLcd((lcd) => processLcd(lcd));

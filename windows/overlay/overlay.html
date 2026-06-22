@@ -135,6 +135,7 @@
       function handle(id, content) {
         if (id === "new-item" && content) showToast(content);
         else if (id === "debug-status" && content) showStatus(content);
+        else if (id === "reset") toasts.innerHTML = ""; // 새 게임: 토스트 비움
       }
       if (typeof overwolf !== "undefined") {
         overwolf.windows.onMessageReceived.addListener((msg) =>

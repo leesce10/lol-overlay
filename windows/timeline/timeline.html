@@ -419,11 +419,20 @@
       }
       requestAnimationFrame(render);
 
+      // 새 게임 시작 등: 모든 마커(복귀/오브젝트) 제거
+      function resetAll() {
+        for (const [, t] of timers) t.el.remove();
+        timers.clear();
+        for (const [, f] of fights) f.el.remove();
+        fights.clear();
+      }
+
       function handle(id, content) {
         if (!content) return;
         if (id === "respawn-add") addRespawn(content);
         else if (id === "fight-update") updateFight(content);
         else if (id === "fight-clear") clearFight(content.key);
+        else if (id === "reset") resetAll();
       }
 
       // 네이티브 Overwolf 창: background가 보내는 메시지 직접 수신
