@@ -549,11 +549,16 @@ function maybeBriefing(players) {
     .then((r) => r.json())
     .then((data) => {
       lastBriefing = data;
-      const tts = data && data.briefing && data.briefing.tts;
-      log("브리핑:", data.briefing && data.briefing.compEdge, "| TTS:", !!tts);
-      // 창 띄우지 않고 background에서 바로 음성 재생 (autoplay 제약 없음)
-      if (tts) playTts(tts);
-      else briefingSent = false; // 브리핑 못 만들면 다음 스냅샷서 재시도
+      const b = data && data.briefing;
+      const tts = b && b.tts;
+      log("브리핑:", b && b.compEdge, "| 1부:", !!tts, "| 2부:", !!(b && b.laneTts));
+      if (tts) {
+        playTts(tts); // 1부 — 팀 5:5 (시작 직후)
+        // 2부 — 내 라인 코칭. 약 3초 텀 두고 재생(요즘 라인전 빨라 짧게)
+        if (b.laneTts) setTimeout(() => playTts(b.laneTts), 3000);
+      } else {
+        briefingSent = false; // 브리핑 못 만들면 다음 스냅샷서 재시도
+      }
     })
     .catch((e) => {
       log("브리핑 요청 실패", e);
