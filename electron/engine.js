@@ -533,7 +533,12 @@ function maybeBriefing(players) {
   briefingSent = true;
 
   const participants = buildParticipants(players);
-  const payload = { myTeamId: myTeamId(participants), participants };
+  // 내 라인 맞라인 코칭용: 내가 누구인지(챔프/포지션) 같이 보냄
+  const meP = players.find((p) => sameName(p, activeSummoner));
+  const me = meP
+    ? { championKey: championKeyOf(meP), position: meP.position || undefined }
+    : undefined;
+  const payload = { myTeamId: myTeamId(participants), participants, me };
 
   const url = API_BASE + TEAM_ANALYSIS;
   fetch(url, {
