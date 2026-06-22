@@ -24,10 +24,15 @@ jobs:
         working-directory: electron
         run: npm ci
 
-      # 버전을 빌드 번호로 올려 발행 → electron-updater가 새 버전 감지.
-      # electron-builder가 .exe + latest.yml + blockmap을 GitHub Release(v<version>)에 게시.
+      # 버전을 빌드 번호로 올림 → electron-updater가 새 버전 감지
+      - name: Set version 0.1.${{ github.run_number }}
+        working-directory: electron
+        shell: bash
+        run: node -e "const fs=require('fs'),p=require('./package.json');p.version='0.1.${{ github.run_number }}';fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+
+      # electron-builder가 .exe + latest.yml + blockmap을 GitHub Release(v<version>)에 게시
       - name: Build & publish (.exe + 업데이트 메타)
         working-directory: electron
-        run: npm run dist -- --publish always -c.extraMetadata.version=0.1.${{ github.run_number }}
+        run: npm run dist -- --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
