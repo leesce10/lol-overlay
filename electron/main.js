@@ -225,7 +225,16 @@ function updateMenuItem() {
         label: "✅ 업데이트 설치하고 재시작",
         click: () => {
           isQuitting = true;
-          autoUpdater.quitAndInstall();
+          // 종료를 막던 핸들러 제거 + 창/트레이 강제 정리 → 설치 프로그램이 닫을 게 없음
+          app.removeAllListeners("window-all-closed");
+          try {
+            if (tray) tray.destroy();
+            BrowserWindow.getAllWindows().forEach((w) => {
+              try { w.destroy(); } catch (e) {}
+            });
+          } catch (e) {}
+          // isSilent=true → NSIS 무인 설치(닫기 대화상자 안 뜸), isForceRunAfter=true → 설치 후 재실행
+          setImmediate(() => autoUpdater.quitAndInstall(true, true));
         },
       };
     case "latest":
