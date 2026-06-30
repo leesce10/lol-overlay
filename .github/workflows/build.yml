@@ -1,6 +1,6 @@
-name: Build Windows installer
+name: Build installers (Win + Mac)
 
-# 수동 실행(Run workflow 버튼) 또는 v* 태그 푸시 시 .exe 빌드 → Release 발행
+# 수동 실행(Run workflow 버튼) 또는 v* 태그 푸시 시 .exe/.dmg 빌드 → Release 발행
 on:
   workflow_dispatch:
   push:
@@ -34,5 +34,27 @@ jobs:
       - name: Build & publish (.exe + 업데이트 메타)
         working-directory: electron
         run: npm run dist -- --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac:
+    needs: build # Windows job이 먼저 Release(v<version>)를 만든 뒤 .dmg를 같은 Release에 추가
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps
+        working-directory: electron
+        run: npm ci
+      - name: Set version 0.1.${{ github.run_number }}
+        working-directory: electron
+        shell: bash
+        run: node -e "const fs=require('fs'),p=require('./package.json');p.version='0.1.${{ github.run_number }}';fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+      # 유니버설(.dmg, 인텔+애플실리콘)을 같은 v<version> Release에 게시
+      - name: Build & publish (.dmg)
+        working-directory: electron
+        run: npm run dist:mac -- --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

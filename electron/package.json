@@ -8,7 +8,9 @@
     "prestart": "node sync-ui.js",
     "start": "electron .",
     "predist": "node sync-ui.js",
-    "dist": "electron-builder --win --x64"
+    "dist": "electron-builder --win --x64",
+    "predist:mac": "node sync-ui.js",
+    "dist:mac": "electron-builder --mac"
   },
   "devDependencies": {
     "electron": "^31.0.0",
@@ -34,6 +36,10 @@
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": "universal" }],
+      "category": "public.app-category.utilities"
     },
     "publish": [
       {
