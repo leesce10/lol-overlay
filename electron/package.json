@@ -24,6 +24,8 @@
       "main.js",
       "preload-engine.js",
       "preload-overlay.js",
+      "preload-settings.js",
+      "settings.html",
       "engine.html",
       "engine.js",
       "ui/**/*",
