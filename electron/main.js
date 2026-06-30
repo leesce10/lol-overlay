@@ -307,8 +307,11 @@ function updateMenuItem() {
               try { w.destroy(); } catch (e) {}
             });
           } catch (e) {}
-          // isSilent=true → NSIS 무인 설치(닫기 대화상자 안 뜸), isForceRunAfter=true → 설치 후 재실행
-          setImmediate(() => autoUpdater.quitAndInstall(true, true));
+          // isSilent=false → 설치 프로그램이 앱 종료를 기다린 뒤 옛 파일을 지움.
+          //   (true=무인이면 닫기 대기를 건너뛰어 "Failed to uninstall old application
+          //    files: 2"(파일 잠금) 발생). isForceRunAfter=true → 설치 후 재실행.
+          // 창/트레이는 위에서 이미 정리했으므로 "닫을 수 없음" 대화상자는 안 뜬다.
+          setImmediate(() => autoUpdater.quitAndInstall(false, true));
         },
       };
     case "latest":
