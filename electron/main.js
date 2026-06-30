@@ -9,8 +9,44 @@
 const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } =
   require("electron");
 const path = require("path");
+const fs = require("fs");
 const https = require("https");
 const { autoUpdater } = require("electron-updater");
+
+// ---- 설정(기능×채널 토글) 영속 저장 ----------------------------------------
+const SETTINGS_DEFAULT = {
+  briefing: { voice: true },
+  itemAlert: { overlay: true, voice: true },
+  respawn: { overlay: true, voice: true },
+  objective: { overlay: true, voice: true },
+  volume: 0.8,
+  muted: false,
+};
+let settings = { ...SETTINGS_DEFAULT };
+function settingsPath() {
+  return path.join(app.getPath("userData"), "settings.json");
+}
+function loadSettings() {
+  try {
+    const raw = fs.readFileSync(settingsPath(), "utf8");
+    settings = { ...SETTINGS_DEFAULT, ...JSON.parse(raw) };
+  } catch (e) {
+    settings = { ...SETTINGS_DEFAULT };
+  }
+}
+function saveSettings(s) {
+  settings = { ...SETTINGS_DEFAULT, ...s };
+  try {
+    fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2));
+  } catch (e) {
+    console.log("[main] 설정 저장 실패:", e && e.message);
+  }
+  sendSettingsToEngine();
+}
+function sendSettingsToEngine() {
+  if (engineReady && engineWin && !engineWin.isDestroyed())
+    engineWin.webContents.send("settings", settings);
+}
 
 // UI/아이콘은 sync-ui.js가 빌드 전에 electron/ 안으로 복사(.exe 자체 포함)
 const OVERLAY_HTML = path.join(__dirname, "ui", "overlay.html");
@@ -75,9 +111,40 @@ function makeEngineWindow() {
   win.loadFile(ENGINE_HTML);
   win.webContents.on("did-finish-load", () => {
     engineReady = true;
+    sendSettingsToEngine(); // 엔진 준비되면 현재 설정 전달
   });
   return win;
 }
+
+// ---- 설정 창 ----------------------------------------------------------------
+let settingsWin = null;
+function openSettings() {
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.show();
+    settingsWin.focus();
+    return;
+  }
+  settingsWin = new BrowserWindow({
+    width: 460,
+    height: 460,
+    title: "LoL Overlay 설정",
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload-settings.js"),
+      contextIsolation: false,
+      nodeIntegration: false,
+    },
+  });
+  settingsWin.setMenuBarVisibility(false);
+  settingsWin.loadFile(path.join(__dirname, "settings.html"));
+  settingsWin.on("closed", () => (settingsWin = null));
+}
+
+ipcMain.handle("get-settings", () => settings);
+ipcMain.on("save-settings", (_e, s) => saveSettings(s));
 
 // 게임 해상도(주 모니터) 기준 배치 — Overwolf 버전 좌표 그대로
 function positionWindows() {
@@ -254,6 +321,8 @@ function rebuildTray() {
         label: `LoL Overlay v${app.getVersion()}${updateStatus === "downloaded" ? " (업데이트 준비됨)" : ""}`,
         enabled: false,
       },
+      { type: "separator" },
+      { label: "⚙️ 설정 (기능 켜기/끄기)", click: openSettings },
       { type: "separator" },
       updateMenuItem(),
       { type: "separator" },

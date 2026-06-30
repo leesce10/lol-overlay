@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>LoL Overlay 설정</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Pretendard", "Malgun Gothic", sans-serif;
+        background: #14171f;
+        color: #e8ecf4;
+        padding: 18px 20px 22px;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      h1 { font-size: 16px; margin: 0 0 4px; }
+      .sub { font-size: 11px; color: #8a93a6; margin: 0 0 16px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 9px 6px; text-align: center; }
+      th { font-size: 11px; color: #8a93a6; font-weight: 600; border-bottom: 1px solid #262b38; }
+      td.feat { text-align: left; font-size: 13px; }
+      tr, tbody tr + tr td { border-top: 1px solid #1d212c; }
+      .na { color: #4a5163; font-size: 11px; }
+      input[type="checkbox"] { width: 17px; height: 17px; accent-color: #5b6cff; cursor: pointer; }
+      .vol { margin-top: 18px; padding-top: 14px; border-top: 1px solid #262b38; }
+      .vol label { font-size: 12px; color: #c8cfe0; display: flex; align-items: center; gap: 10px; }
+      input[type="range"] { flex: 1; accent-color: #5b6cff; }
+      .mute { margin-top: 10px; font-size: 12px; color: #c8cfe0; display: flex; align-items: center; gap: 8px; }
+      .row-actions { margin-top: 18px; display: flex; gap: 8px; justify-content: flex-end; }
+      button {
+        font-size: 13px; font-weight: 700; border: 0; border-radius: 8px;
+        padding: 9px 16px; cursor: pointer;
+      }
+      .save { background: linear-gradient(135deg, #5b6cff, #7c3aed); color: #fff; }
+      .saved { font-size: 12px; color: #4ade80; align-self: center; margin-right: auto; opacity: 0; transition: opacity .2s; }
+      .saved.show { opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <h1>⚙️ LoL Overlay 설정</h1>
+    <p class="sub">기능마다 화면(오버레이)과 음성을 따로 켜고 끌 수 있어요. 저장하면 바로 적용됩니다.</p>
+
+    <table>
+      <thead>
+        <tr><th style="text-align:left">기능</th><th>오버레이</th><th>음성</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feat">조합 브리핑</td>
+          <td><span class="na">—</span></td>
+          <td><input type="checkbox" data-feat="briefing" data-ch="voice" /></td>
+        </tr>
+        <tr>
+          <td class="feat">적 아이템 구매 알림</td>
+          <td><input type="checkbox" data-feat="itemAlert" data-ch="overlay" /></td>
+          <td><input type="checkbox" data-feat="itemAlert" data-ch="voice" /></td>
+        </tr>
+        <tr>
+          <td class="feat">적 라인복귀 타이머</td>
+          <td><input type="checkbox" data-feat="respawn" data-ch="overlay" /></td>
+          <td><input type="checkbox" data-feat="respawn" data-ch="voice" /></td>
+        </tr>
+        <tr>
+          <td class="feat">오브젝트 교전</td>
+          <td><input type="checkbox" data-feat="objective" data-ch="overlay" /></td>
+          <td><input type="checkbox" data-feat="objective" data-ch="voice" /></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="vol">
+      <label>🔊 음성 볼륨 <input type="range" id="vol" min="0" max="100" value="80" /> <span id="volpct">80%</span></label>
+      <label class="mute"><input type="checkbox" id="muted" /> 전체 음소거</label>
+    </div>
+
+    <div class="row-actions">
+      <span class="saved" id="saved">✓ 저장됨</span>
+      <button class="save" id="save">저장</button>
+    </div>
+
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const boxes = [...document.querySelectorAll("input[data-feat]")];
+      const vol = $("#vol"), volpct = $("#volpct"), muted = $("#muted");
+      vol.addEventListener("input", () => (volpct.textContent = vol.value + "%"));
+
+      function fill(s) {
+        for (const b of boxes) {
+          const f = s[b.dataset.feat] || {};
+          b.checked = f[b.dataset.ch] !== false;
+        }
+        vol.value = Math.round((s.volume ?? 0.8) * 100);
+        volpct.textContent = vol.value + "%";
+        muted.checked = !!s.muted;
+      }
+      function collect() {
+        const out = { briefing: {}, itemAlert: {}, respawn: {}, objective: {} };
+        for (const b of boxes) out[b.dataset.feat][b.dataset.ch] = b.checked;
+        out.volume = Number(vol.value) / 100;
+        out.muted = muted.checked;
+        return out;
+      }
+
+      (async () => {
+        try { fill(await window.settingsAPI.get()); } catch (e) {}
+      })();
+
+      $("#save").addEventListener("click", () => {
+        window.settingsAPI.save(collect());
+        const s = $("#saved");
+        s.classList.add("show");
+        setTimeout(() => s.classList.remove("show"), 1500);
+      });
+    </script>
+  </body>
+</html>

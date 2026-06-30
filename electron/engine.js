@@ -14,6 +14,18 @@ let dbgDeaths = 0;
 const prevItems = new Map();
 const prevVisible = new Map();
 
+// ---- 설정(기능×채널 토글). main이 settings.json 읽어 전달. 기본 전부 ON ----
+let settings = {
+  briefing: { voice: true },
+  itemAlert: { overlay: true, voice: true },
+  respawn: { overlay: true, voice: true },
+  objective: { overlay: true, voice: true },
+  volume: 0.8,
+  muted: false,
+};
+const voiceOn = (feat) => !settings.muted && settings[feat] && settings[feat].voice !== false;
+const overlayOn = (feat) => settings[feat] && settings[feat].overlay !== false;
+
 function log(...args) {
   console.log("[engine]", ...args);
 }
@@ -264,9 +276,11 @@ function pushTimeline(id, content) {
   engineAPI.sendUi("timeline", id, content);
 }
 function pushRespawn(payload) {
+  if (!overlayOn("respawn")) return; // 복귀 오버레이 꺼짐
   pushTimeline("respawn-add", payload);
 }
 function pushFight(payload) {
+  if (!overlayOn("objective")) return; // 교전 오버레이 꺼짐
   pushTimeline("fight-update", payload);
 }
 
@@ -302,6 +316,12 @@ function updateRespawns(players) {
     if (justDied) {
       dbgDeaths++;
       log("적 사망 감지:", name, "deaths", deaths);
+      // 라인복귀 음성(죽는 순간 1회)
+      const cn = p.championName || championKeyOf(p) || name;
+      playTts(
+        `상대 ${cn}${josa(cn, "이", "가")} 죽었어요. 지금 라인 주도권을 잡으세요.`,
+        "respawn"
+      );
     }
 
     // 죽는 순간 1회 발사 + (respawnTimer 있으면) 죽어있는 동안 매 스냅샷 정확 보정
@@ -414,6 +434,7 @@ function buildFightTts(res, stage, label, sec) {
 }
 
 function maybeFightTts(res, obj) {
+  if (!voiceOn("objective")) return; // 교전 음성 꺼짐
   // 남은 시간으로 단계 결정: ~60초 전 / ~30초 전 / 소환 직후
   const sec = obj.secondsTo;
   const stage = sec >= 40 ? "60" : sec >= 5 ? "30" : "spawn";
@@ -423,7 +444,7 @@ function maybeFightTts(res, obj) {
   fightTtsSpoken[inst].add(stage);
   const text = buildFightTts(res, stage, obj.label, sec);
   log("교전 TTS:", stage, text);
-  playTts(text);
+  playTts(text, "objective");
 }
 
 // 유충은 처치 이벤트가 없어 시간 기반으로 마커 정리(스폰 8:00 → ~9:00 제거)
@@ -555,9 +576,9 @@ function maybeBriefing(players) {
       const tts = b && b.tts;
       log("브리핑:", b && b.compEdge, "| 1부:", !!tts, "| 2부:", !!(b && b.laneTts));
       if (tts) {
-        playTts(tts); // 1부 — 팀 5:5 (시작 직후)
+        playTts(tts, "briefing"); // 1부 — 팀 5:5 (시작 직후)
         // 2부 — 내 라인 코칭. 약 3초 텀 두고 재생(요즘 라인전 빨라 짧게)
-        if (b.laneTts) setTimeout(() => playTts(b.laneTts), 3000);
+        if (b.laneTts) setTimeout(() => playTts(b.laneTts, "briefing"), 3000);
       } else {
         briefingSent = false; // 브리핑 못 만들면 다음 스냅샷서 재시도
       }
@@ -569,13 +590,17 @@ function maybeBriefing(players) {
 }
 
 // engine(숨은 렌더러)에서 TTS 직접 재생 → 창·클릭 불필요
+// category: 기능별 음성 on/off 게이트("briefing"/"itemAlert"/"respawn"/"objective")
 let briefingAudio = null;
-function playTts(text) {
+function playTts(text, category) {
+  if (category && !voiceOn(category)) return; // 해당 기능 음성 꺼짐 / 음소거
+  if (!text) return;
   const url =
     API_BASE + "/api/live/tts?voice=female&text=" + encodeURIComponent(text);
   try {
     if (!briefingAudio) briefingAudio = new Audio();
     briefingAudio.src = url;
+    briefingAudio.volume = Math.max(0, Math.min(1, settings.volume ?? 0.8));
     briefingAudio.play().catch((e) => log("TTS 재생 실패:", e && e.message));
   } catch (e) {
     log("TTS 오류:", e);
@@ -709,13 +734,14 @@ function josa(word, withBatchim, withoutBatchim) {
 
 function notifyOverlay(payload) {
   log("새 아이템:", payload.championName, payload.itemName);
-  engineAPI.sendUi("overlay", "new-item", payload);
-  // 토스트와 함께 음성으로도 알림
+  if (overlayOn("itemAlert")) engineAPI.sendUi("overlay", "new-item", payload); // 토스트
+  // 음성 알림(별도 채널)
   const champ = payload.championName;
   const item = payload.itemName;
   if (champ && item) {
     playTts(
-      `상대 ${champ}${josa(champ, "이", "가")} ${item}${josa(item, "을", "를")} 구매했습니다. 인지하고 플레이하세요!`
+      `상대 ${champ}${josa(champ, "이", "가")} ${item}${josa(item, "을", "를")} 구매했습니다. 인지하고 플레이하세요!`,
+      "itemAlert"
     );
   }
 }
@@ -731,4 +757,8 @@ engineAPI.onGameStart(() => {
   loadCoreItems();
 });
 engineAPI.onLcd((lcd) => processLcd(lcd));
+engineAPI.onSettings((s) => {
+  if (s) settings = { ...settings, ...s };
+  log("설정 갱신:", JSON.stringify(settings));
+});
 engineAPI.onGameEnd(() => resetState());

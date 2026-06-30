@@ -6,6 +6,7 @@ window.engineAPI = {
   onGameStart: (cb) => ipcRenderer.on("game-start", () => cb()),
   onGameEnd: (cb) => ipcRenderer.on("game-end", () => cb()),
   onLcd: (cb) => ipcRenderer.on("lcd-update", (_e, lcd) => cb(lcd)),
+  onSettings: (cb) => ipcRenderer.on("settings", (_e, s) => cb(s)),
   // engine → main → overlay/timeline 창으로 전달
   sendUi: (target, id, content) =>
     ipcRenderer.send("ui-message", { target, id, content }),
