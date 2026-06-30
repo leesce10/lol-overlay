@@ -21,6 +21,7 @@ const SETTINGS_DEFAULT = {
   objective: { overlay: true, voice: true },
   volume: 0.8,
   muted: false,
+  tone: "banmal", // 음성 말투: "banmal"(친근한 반말, 기본) | "jondaetmal"(존댓말)
 };
 let settings = { ...SETTINGS_DEFAULT };
 function settingsPath() {
@@ -126,7 +127,7 @@ function openSettings() {
   }
   settingsWin = new BrowserWindow({
     width: 460,
-    height: 460,
+    height: 530,
     title: "LoL Overlay 설정",
     resizable: false,
     minimizable: false,

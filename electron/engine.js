@@ -22,9 +22,61 @@ let settings = {
   objective: { overlay: true, voice: true },
   volume: 0.8,
   muted: false,
+  tone: "banmal", // 음성 말투: "banmal"(친근한 반말, 기본) | "jondaetmal"(존댓말)
 };
 const voiceOn = (feat) => !settings.muted && settings[feat] && settings[feat].voice !== false;
 const overlayOn = (feat) => settings[feat] && settings[feat].overlay !== false;
+
+// ---- 존댓말 → 반말 변환 -----------------------------------------------------
+// 모든 TTS 문장(로컬·서버 모두)은 존댓말로 작성된다. 기본 말투가 반말이라
+// playTts에서 한 번에 변환한다. 문장은 정형 템플릿이라 종결어미 집합이 유한 →
+// 문장 끝(구두점/공백/끝) 기준으로만 치환해 문장 중간 오변환을 막는다.
+const BANMAL_RULES = [
+  // 명령형(~세요) — 어간 변형이 필요해 명시적으로
+  ["잡으세요", "잡아"],
+  ["싸우세요", "싸워"],
+  ["두세요", "둬"],
+  ["가세요", "가"], // 풀어가세요 포함
+  ["마세요", "마"],
+  ["보세요", "봐"],
+  ["굴리세요", "굴려"],
+  ["노리세요", "노려"],
+  ["하세요", "해"], // 교전/유지/조심/차단/피하세요 등
+  // 합쇼체(~습니다)
+  ["했습니다", "했어"],
+  ["됩니다", "돼"],
+  ["좋습니다", "좋아"],
+  ["합니다", "해"],
+  ["입니다", "이야"], // 전입니다 → 전이야
+  // 해요체 서술(~요)
+  ["이에요", "이야"],
+  ["예요", "야"],
+  ["했어요", "했어"],
+  ["됐어요", "됐어"],
+  ["어요", "어"],
+  ["아요", "아"],
+  ["해요", "해"], // 강/위험/중요/못/부족/비슷해요
+  ["져요", "져"],
+  ["서요", "서"],
+  // 축약 모음 어간(방어적) — 노려요/켜요/와요/워요/줘요/봐요/대요
+  ["려요", "려"],
+  ["켜요", "켜"],
+  ["와요", "와"],
+  ["워요", "워"],
+  ["줘요", "줘"],
+  ["봐요", "봐"],
+  ["대요", "대"],
+].map(([from, to]) => [
+  // 문장 끝(구두점/공백/문자열 끝)에 붙은 어미만 변환
+  new RegExp(from + "(?=[.!?…,\\s]|$)", "g"),
+  to,
+]);
+function toBanmal(text) {
+  if (!text) return text;
+  let out = text;
+  for (const [re, to] of BANMAL_RULES) out = out.replace(re, to);
+  return out;
+}
 
 function log(...args) {
   console.log("[engine]", ...args);
@@ -595,6 +647,7 @@ let briefingAudio = null;
 function playTts(text, category) {
   if (category && !voiceOn(category)) return; // 해당 기능 음성 꺼짐 / 음소거
   if (!text) return;
+  if (settings.tone !== "jondaetmal") text = toBanmal(text); // 기본: 친근한 반말
   const url =
     API_BASE + "/api/live/tts?voice=female&text=" + encodeURIComponent(text);
   try {
