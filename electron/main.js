@@ -66,6 +66,7 @@ let engineWin = null;
 let tray = null;
 let engineReady = false;
 let inGame = false;
+let pollTimer = null;
 
 // ---- 창 생성 --------------------------------------------------------------
 
@@ -266,18 +267,30 @@ function setUpdateStatus(s, err) {
 }
 
 // 업데이트 설치(앱 종료 → 설치 프로그램 실행 → 재시작). 대화상자/메뉴 공용.
+let installing = false;
 function installUpdate() {
+  if (installing) return;
+  installing = true;
   isQuitting = true;
-  // 종료를 막던 핸들러 제거 + 창/트레이 강제 정리 → 설치 프로그램이 닫을 게 없음
+  // 살아있는 작업/창을 모두 정리 → 프로세스가 곧장 죽도록(설치 프로그램이 옛
+  // 파일을 지우거나 닫을 게 없어짐). 이게 안 되면 "Failed to uninstall…/cannot
+  // be closed" 경합이 생긴다.
   app.removeAllListeners("window-all-closed");
+  try { if (pollTimer) clearInterval(pollTimer); } catch (e) {}
   try {
     if (tray) tray.destroy();
     BrowserWindow.getAllWindows().forEach((w) => {
       try { w.destroy(); } catch (e) {}
     });
   } catch (e) {}
-  // isSilent=false → 설치 프로그램이 앱 종료를 기다린 뒤 옛 파일 교체(파일 잠금 방지)
-  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  // quitAndInstall이 detached로 설치 프로그램을 띄운다(isForceRunAfter=true → 설치 후 재실행).
+  autoUpdater.quitAndInstall(false, true);
+  // graceful quit이 간혹 안 끝나 설치 프로그램이 우리를 기다리다 실패/대기한다.
+  // 설치 프로그램은 이미 분리 실행됐으므로, 우리 프로세스를 강제 종료해 길을
+  // 비워준다(잠금 해제 → 설치 자동 진행, "닫을 수 없음" 안 뜸).
+  setTimeout(() => {
+    try { app.exit(0); } catch (e) {}
+  }, 1200);
 }
 
 // "업데이트가 있습니다. 업데이트 하시겠습니까?" → 예 누르면 설치
@@ -420,7 +433,7 @@ if (!gotLock) {
     overlayWin = makeClickThroughWindow(OVERLAY_HTML, OVERLAY_W, OVERLAY_H);
     timelineWin = makeClickThroughWindow(TIMELINE_HTML, TIMELINE_W, TIMELINE_H);
     makeTray();
-    setInterval(pollLcd, 1000);
+    pollTimer = setInterval(pollLcd, 1000);
     setupUpdater();
     if (app.isPackaged) checkForUpdates(); // 시작 시 1회 자동 확인
     console.log("[main] LoL Overlay 시작 — 게임 대기 중");
