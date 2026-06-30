@@ -83,8 +83,8 @@
       </label>
       <label style="margin-top:14px">🧑 목소리
         <select id="voice">
-          <option value="female">여성 (기본)</option>
-          <option value="male">남성</option>
+          <option value="male">남성 (기본)</option>
+          <option value="female">여성</option>
         </select>
         <button class="test" id="test" type="button">▶ 테스트 재생</button>
       </label>
@@ -112,7 +112,7 @@
         volpct.textContent = vol.value + "%";
         muted.checked = !!s.muted;
         tone.value = s.tone === "jondaetmal" ? "jondaetmal" : "banmal";
-        voice.value = s.voice === "male" ? "male" : "female";
+        voice.value = s.voice === "female" ? "female" : "male";
       }
       function collect() {
         const out = { briefing: {}, itemAlert: {}, respawn: {}, objective: {} };

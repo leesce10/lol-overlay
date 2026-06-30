@@ -23,7 +23,7 @@ let settings = {
   volume: 0.8,
   muted: false,
   tone: "banmal", // 음성 말투: "banmal"(친근한 반말, 기본) | "jondaetmal"(존댓말)
-  voice: "female", // 목소리: "female"(여성, 기본) | "male"(남성)
+  voice: "male", // 목소리: "male"(남성, 기본) | "female"(여성)
 };
 const voiceOn = (feat) => !settings.muted && settings[feat] && settings[feat].voice !== false;
 const overlayOn = (feat) => settings[feat] && settings[feat].overlay !== false;
@@ -649,7 +649,7 @@ let briefingAudio = null;
 function speak(text, { voice, tone } = {}) {
   if (!text) return;
   if ((tone ?? settings.tone) !== "jondaetmal") text = toBanmal(text); // 기본: 친근한 반말
-  const v = voice ?? settings.voice ?? "female";
+  const v = voice ?? settings.voice ?? "male";
   const url =
     API_BASE +
     "/api/live/tts?voice=" +
@@ -677,7 +677,7 @@ function playTestVoice(cfg) {
   cfg = cfg || {};
   const sample =
     "상대 정글러가 위쪽에서 내려오고 있어요. 지금 라인을 빼고 갱킹을 조심하세요.";
-  speak(sample, { voice: cfg.voice || "female", tone: cfg.tone || "banmal" });
+  speak(sample, { voice: cfg.voice || "male", tone: cfg.tone || "banmal" });
 }
 
 // ---- 적 아이템 구매 감지 --------------------------------------------------

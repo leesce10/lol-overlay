@@ -22,7 +22,7 @@ const SETTINGS_DEFAULT = {
   volume: 0.8,
   muted: false,
   tone: "banmal", // 음성 말투: "banmal"(친근한 반말, 기본) | "jondaetmal"(존댓말)
-  voice: "female", // 목소리: "female"(여성, 기본) | "male"(남성)
+  voice: "male", // 목소리: "male"(남성, 기본) | "female"(여성)
 };
 let settings = { ...SETTINGS_DEFAULT };
 function settingsPath() {
