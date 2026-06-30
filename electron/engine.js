@@ -372,10 +372,18 @@ function updateRespawns(players) {
     const justDied = deaths > prev; // 사망 횟수 증가 = 방금 죽음
     const hasTimer = typeof p.respawnTimer === "number" && p.respawnTimer > 0;
 
+    const cn = p.championName || championKeyOf(p) || name;
+    // "복귀"는 Edge TTS가 "복구"로 오발음 → "라인에 돌아와"로 표현(발음 명확+자연스러움)
+    const warnText = `${cn} ${RESPAWN_WARN_LEAD}초 뒤 라인에 돌아와요. 생각하고 플레이하세요.`;
+
     if (justDied) {
       dbgDeaths++;
       log("적 사망 감지:", name, "deaths", deaths);
       respawnWarned.set(name, false); // 새 사망 → 복귀 경고 재무장
+      // 죽는 즉시 음성을 미리 받아둠 → 5초 시점에 즉시 재생(합성 지연으로 늦게
+      // 들리던 문제 해결). 음성 꺼져 있으면 미리받기도 생략.
+      if (voiceOn("respawn"))
+        prewarmTts(warnText, { voice: settings.voice, tone: settings.tone });
     }
 
     // 죽는 순간 1회 발사 + (respawnTimer 있으면) 죽어있는 동안 매 스냅샷 정확 보정
@@ -401,11 +409,7 @@ function updateRespawns(players) {
         respawnReturnAt.delete(name); // 복귀 완료 → 정리(다음 사망에 재무장)
       } else if (remain <= RESPAWN_WARN_LEAD && !respawnWarned.get(name)) {
         respawnWarned.set(name, true);
-        const cn = p.championName || championKeyOf(p) || name;
-        playTts(
-          `${cn} 복귀까지 ${RESPAWN_WARN_LEAD}초 남았어요. 생각하고 플레이하세요.`,
-          "respawn"
-        );
+        playTts(warnText, "respawn"); // 미리 받아둔 음성 → 즉시 재생
       }
     }
   }
@@ -664,26 +668,38 @@ function maybeBriefing(players) {
 
 // engine(숨은 렌더러)에서 TTS 직접 재생 → 창·클릭 불필요
 let briefingAudio = null;
-// 저수준 재생: 말투/목소리를 직접 받아 합성·재생(게이트 없음).
-// tone: "banmal"|"jondaetmal", voice: "female"|"male"
-function speak(text, { voice, tone } = {}) {
-  if (!text) return;
+// 말투/목소리를 반영해 TTS URL을 만든다(재생·프리워밍 공용).
+function ttsUrl(text, { voice, tone } = {}) {
   if ((tone ?? settings.tone) !== "jondaetmal") text = toBanmal(text); // 기본: 친근한 반말
   const v = voice ?? settings.voice ?? "male";
-  const url =
+  return (
     API_BASE +
     "/api/live/tts?voice=" +
     encodeURIComponent(v) +
     "&text=" +
-    encodeURIComponent(text);
+    encodeURIComponent(text)
+  );
+}
+// 저수준 재생: 말투/목소리를 직접 받아 합성·재생(게이트 없음).
+// tone: "banmal"|"jondaetmal", voice: "female"|"male"
+function speak(text, opts = {}) {
+  if (!text) return;
   try {
     if (!briefingAudio) briefingAudio = new Audio();
-    briefingAudio.src = url;
+    briefingAudio.src = ttsUrl(text, opts);
     briefingAudio.volume = Math.max(0, Math.min(1, settings.volume ?? 0.8));
     briefingAudio.play().catch((e) => log("TTS 재생 실패:", e && e.message));
   } catch (e) {
     log("TTS 오류:", e);
   }
+}
+// 미리 받아두기: 재생 직전 합성 지연(첫 생성 2~3초)으로 음성이 늦게 들리는 걸
+// 막는다. 미리 fetch해 서버·CDN·브라우저 캐시에 올려두면 나중 재생이 즉시.
+function prewarmTts(text, opts = {}) {
+  if (!text) return;
+  try {
+    fetch(ttsUrl(text, opts)).catch(() => {});
+  } catch (e) {}
 }
 
 // category: 기능별 음성 on/off 게이트("briefing"/"itemAlert"/"respawn"/"objective")
