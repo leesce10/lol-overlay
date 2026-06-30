@@ -92,6 +92,8 @@ function resetState() {
   prevItems.clear();
   prevVisible.clear();
   prevDeaths.clear();
+  respawnReturnAt.clear();
+  respawnWarned.clear();
   processedKills.clear();
   for (const k in objectiveKills) delete objectiveKills[k];
   for (const k in fightTtsSpoken) delete fightTtsSpoken[k];
@@ -341,6 +343,10 @@ function pushFight(payload) {
 // 가장 확실한 신호: scores.deaths(사망 횟수) 증가 = 방금 죽음. (스코어보드 데이터라 항상 들어옴)
 // respawnTimer가 들어오면 매 스냅샷 정확 보정, 아니면 죽는 순간 공식 추정(창이 카운트다운).
 const prevDeaths = new Map();
+// 복귀 경고용: 적이 라인에 돌아올 절대 게임시간(부활+이동) + 경고 발사 여부
+const respawnReturnAt = new Map(); // name -> 복귀 예상 게임시간(초)
+const respawnWarned = new Map(); // name -> 이번 사망에 대해 "복귀 임박" 음성 재생함?
+const RESPAWN_WARN_LEAD = 5; // 복귀 몇 초 전에 경고할지
 function deathCount(p) {
   return (p.scores && (p.scores.deaths ?? p.scores.death)) || 0;
 }
@@ -369,12 +375,7 @@ function updateRespawns(players) {
     if (justDied) {
       dbgDeaths++;
       log("적 사망 감지:", name, "deaths", deaths);
-      // 라인복귀 음성(죽는 순간 1회)
-      const cn = p.championName || championKeyOf(p) || name;
-      playTts(
-        `상대 ${cn}${josa(cn, "이", "가")} 죽었어요. 지금 라인 주도권을 잡으세요.`,
-        "respawn"
-      );
+      respawnWarned.set(name, false); // 새 사망 → 복귀 경고 재무장
     }
 
     // 죽는 순간 1회 발사 + (respawnTimer 있으면) 죽어있는 동안 매 스냅샷 정확 보정
@@ -384,9 +385,28 @@ function updateRespawns(players) {
         ? Math.ceil(p.respawnTimer)
         : Math.round(respawnSeconds(p.level, latestGameTime));
       const totalSec = respawn + travelFor(latestGameTime, p.position, bootTier(p));
+      // 복귀 예상 절대 게임시간(부활 후 이동까지) — 부활해 사라진 뒤에도 카운트다운 유지용
+      respawnReturnAt.set(name, latestGameTime + totalSec);
       openTimeline(() =>
         pushRespawn({ championKey: championKeyOf(p), name, totalSec })
       );
+    }
+
+    // 복귀 임박 경고: 죽이자마자가 아니라 "라인 복귀 약 5초 전"에 1회 알림.
+    // (부활해 사라진 뒤 이동 중에도 절대시간 기준이라 정확히 발사됨)
+    const returnAt = respawnReturnAt.get(name);
+    if (returnAt != null) {
+      const remain = returnAt - latestGameTime;
+      if (remain <= 0) {
+        respawnReturnAt.delete(name); // 복귀 완료 → 정리(다음 사망에 재무장)
+      } else if (remain <= RESPAWN_WARN_LEAD && !respawnWarned.get(name)) {
+        respawnWarned.set(name, true);
+        const cn = p.championName || championKeyOf(p) || name;
+        playTts(
+          `${cn} 복귀까지 ${RESPAWN_WARN_LEAD}초 남았어요. 생각하고 플레이하세요.`,
+          "respawn"
+        );
+      }
     }
   }
 }
