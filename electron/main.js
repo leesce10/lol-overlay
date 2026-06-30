@@ -6,7 +6,7 @@
 // 데이터 출처는 Overwolf가 아니라 롤이 직접 띄우는 https://127.0.0.1:2999.
 // UI(overlay.html/timeline.html)는 Overwolf 버전과 동일 파일을 그대로 재사용.
 
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } =
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, dialog } =
   require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -257,6 +257,7 @@ ipcMain.on("ui-message", (_e, { target, id, content }) => {
 // idle | checking | available | downloading | downloaded | latest | error
 let updateStatus = "idle";
 let updateError = "";
+let manualCheck = false; // 사용자가 "업데이트 확인"을 직접 눌렀는지(피드백 대화상자용)
 
 function setUpdateStatus(s, err) {
   updateStatus = s;
@@ -264,22 +265,93 @@ function setUpdateStatus(s, err) {
   rebuildTray();
 }
 
+// 업데이트 설치(앱 종료 → 설치 프로그램 실행 → 재시작). 대화상자/메뉴 공용.
+function installUpdate() {
+  isQuitting = true;
+  // 종료를 막던 핸들러 제거 + 창/트레이 강제 정리 → 설치 프로그램이 닫을 게 없음
+  app.removeAllListeners("window-all-closed");
+  try {
+    if (tray) tray.destroy();
+    BrowserWindow.getAllWindows().forEach((w) => {
+      try { w.destroy(); } catch (e) {}
+    });
+  } catch (e) {}
+  // isSilent=false → 설치 프로그램이 앱 종료를 기다린 뒤 옛 파일 교체(파일 잠금 방지)
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+}
+
+// "업데이트가 있습니다. 업데이트 하시겠습니까?" → 예 누르면 설치
+function promptInstall() {
+  dialog
+    .showMessageBox({
+      type: "info",
+      buttons: ["예, 지금 설치", "나중에"],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      title: "LoL Overlay 업데이트",
+      message: "업데이트가 있습니다. 업데이트 하시겠습니까?",
+      detail: "설치하면 앱이 잠시 닫혔다가 자동으로 다시 시작됩니다.",
+    })
+    .then(({ response }) => {
+      if (response === 0) installUpdate();
+    });
+}
+
 function setupUpdater() {
   autoUpdater.autoDownload = true; // 백그라운드에서 받아둠
   autoUpdater.autoInstallOnAppQuit = true; // 종료 시 자동 설치
   autoUpdater.on("checking-for-update", () => setUpdateStatus("checking"));
   autoUpdater.on("update-available", () => setUpdateStatus("downloading"));
-  autoUpdater.on("update-not-available", () => setUpdateStatus("latest"));
+  autoUpdater.on("update-not-available", () => {
+    setUpdateStatus("latest");
+    if (manualCheck) {
+      manualCheck = false;
+      dialog.showMessageBox({
+        type: "info",
+        buttons: ["확인"],
+        title: "LoL Overlay 업데이트",
+        message: "이미 최신 버전입니다.",
+      });
+    }
+  });
   autoUpdater.on("download-progress", () => {
     if (updateStatus !== "downloading") setUpdateStatus("downloading");
   });
-  autoUpdater.on("update-downloaded", () => setUpdateStatus("downloaded"));
-  autoUpdater.on("error", (e) => setUpdateStatus("error", e && e.message));
+  autoUpdater.on("update-downloaded", () => {
+    setUpdateStatus("downloaded");
+    // 업데이트가 준비되면 설치 여부를 물어봄(직접 확인했든 자동이든)
+    promptInstall();
+    manualCheck = false;
+  });
+  autoUpdater.on("error", (e) => {
+    setUpdateStatus("error", e && e.message);
+    if (manualCheck) {
+      manualCheck = false;
+      dialog.showMessageBox({
+        type: "error",
+        buttons: ["확인"],
+        title: "LoL Overlay 업데이트",
+        message: "업데이트 확인에 실패했습니다.",
+        detail: (e && e.message) || "",
+      });
+    }
+  });
 }
 
-function checkForUpdates() {
+function checkForUpdates(manual) {
+  if (manual) manualCheck = true;
   if (!app.isPackaged) {
     setUpdateStatus("error", "개발 모드에서는 업데이트 확인 불가");
+    if (manual) {
+      manualCheck = false;
+      dialog.showMessageBox({
+        type: "info",
+        buttons: ["확인"],
+        title: "LoL Overlay 업데이트",
+        message: "개발 모드에서는 업데이트를 확인할 수 없습니다.",
+      });
+    }
     return;
   }
   setUpdateStatus("checking");
@@ -295,31 +367,13 @@ function updateMenuItem() {
     case "downloading":
       return { label: "업데이트 다운로드 중…", enabled: false };
     case "downloaded":
-      return {
-        label: "✅ 업데이트 설치하고 재시작",
-        click: () => {
-          isQuitting = true;
-          // 종료를 막던 핸들러 제거 + 창/트레이 강제 정리 → 설치 프로그램이 닫을 게 없음
-          app.removeAllListeners("window-all-closed");
-          try {
-            if (tray) tray.destroy();
-            BrowserWindow.getAllWindows().forEach((w) => {
-              try { w.destroy(); } catch (e) {}
-            });
-          } catch (e) {}
-          // isSilent=false → 설치 프로그램이 앱 종료를 기다린 뒤 옛 파일을 지움.
-          //   (true=무인이면 닫기 대기를 건너뛰어 "Failed to uninstall old application
-          //    files: 2"(파일 잠금) 발생). isForceRunAfter=true → 설치 후 재실행.
-          // 창/트레이는 위에서 이미 정리했으므로 "닫을 수 없음" 대화상자는 안 뜬다.
-          setImmediate(() => autoUpdater.quitAndInstall(false, true));
-        },
-      };
+      return { label: "✅ 업데이트 설치하고 재시작", click: promptInstall };
     case "latest":
-      return { label: "최신 버전입니다 (다시 확인)", click: checkForUpdates };
+      return { label: "최신 버전입니다 (다시 확인)", click: () => checkForUpdates(true) };
     case "error":
-      return { label: "업데이트 확인 실패 (다시 시도)", click: checkForUpdates };
+      return { label: "업데이트 확인 실패 (다시 시도)", click: () => checkForUpdates(true) };
     default:
-      return { label: "업데이트 확인", click: checkForUpdates };
+      return { label: "업데이트 확인", click: () => checkForUpdates(true) };
   }
 }
 
