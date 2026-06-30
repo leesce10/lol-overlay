@@ -698,9 +698,26 @@ function detectNewItems(players) {
 
 // ---- 오버레이 전송 (창 배치/생성은 main이 담당) ---------------------------
 
+// 한글 받침 유무로 조사 선택 (이/가, 을/를)
+function josa(word, withBatchim, withoutBatchim) {
+  const w = (word || "").trim();
+  if (!w) return withoutBatchim;
+  const last = w.charCodeAt(w.length - 1);
+  if (last < 0xac00 || last > 0xd7a3) return withoutBatchim; // 한글 아니면 받침 없음 취급
+  return (last - 0xac00) % 28 !== 0 ? withBatchim : withoutBatchim;
+}
+
 function notifyOverlay(payload) {
   log("새 아이템:", payload.championName, payload.itemName);
   engineAPI.sendUi("overlay", "new-item", payload);
+  // 토스트와 함께 음성으로도 알림
+  const champ = payload.championName;
+  const item = payload.itemName;
+  if (champ && item) {
+    playTts(
+      `상대 ${champ}${josa(champ, "이", "가")} ${item}${josa(item, "을", "를")} 구매했습니다. 인지하고 플레이하세요!`
+    );
+  }
 }
 
 // ---- main(IPC) 연동 -------------------------------------------------------
