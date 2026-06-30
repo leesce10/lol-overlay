@@ -4,4 +4,5 @@ const { ipcRenderer } = require("electron");
 window.settingsAPI = {
   get: () => ipcRenderer.invoke("get-settings"),
   save: (s) => ipcRenderer.send("save-settings", s),
+  test: (cfg) => ipcRenderer.send("test-voice", cfg),
 };

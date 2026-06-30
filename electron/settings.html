@@ -28,6 +28,9 @@
       .vol label { font-size: 12px; color: #c8cfe0; display: flex; align-items: center; gap: 10px; }
       input[type="range"] { flex: 1; accent-color: #5b6cff; }
       select { background: #1d212c; color: #e8ecf4; border: 1px solid #2c3242; border-radius: 7px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+      .test { background: #232838; color: #c8cfe0; border: 1px solid #2c3242; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+      .test:hover { background: #2c3242; }
+      .test:active { transform: scale(.97); }
       .mute { margin-top: 10px; font-size: 12px; color: #c8cfe0; display: flex; align-items: center; gap: 8px; }
       .row-actions { margin-top: 18px; display: flex; gap: 8px; justify-content: flex-end; }
       button {
@@ -78,6 +81,13 @@
           <option value="jondaetmal">존댓말</option>
         </select>
       </label>
+      <label style="margin-top:14px">🧑 목소리
+        <select id="voice">
+          <option value="female">여성 (기본)</option>
+          <option value="male">남성</option>
+        </select>
+        <button class="test" id="test" type="button">▶ 테스트 재생</button>
+      </label>
       <label style="margin-top:14px">🔊 음성 볼륨 <input type="range" id="vol" min="0" max="100" value="80" /> <span id="volpct">80%</span></label>
       <label class="mute"><input type="checkbox" id="muted" /> 전체 음소거</label>
     </div>
@@ -90,7 +100,7 @@
     <script>
       const $ = (s) => document.querySelector(s);
       const boxes = [...document.querySelectorAll("input[data-feat]")];
-      const vol = $("#vol"), volpct = $("#volpct"), muted = $("#muted"), tone = $("#tone");
+      const vol = $("#vol"), volpct = $("#volpct"), muted = $("#muted"), tone = $("#tone"), voice = $("#voice");
       vol.addEventListener("input", () => (volpct.textContent = vol.value + "%"));
 
       function fill(s) {
@@ -102,6 +112,7 @@
         volpct.textContent = vol.value + "%";
         muted.checked = !!s.muted;
         tone.value = s.tone === "jondaetmal" ? "jondaetmal" : "banmal";
+        voice.value = s.voice === "male" ? "male" : "female";
       }
       function collect() {
         const out = { briefing: {}, itemAlert: {}, respawn: {}, objective: {} };
@@ -109,8 +120,13 @@
         out.volume = Number(vol.value) / 100;
         out.muted = muted.checked;
         out.tone = tone.value;
+        out.voice = voice.value;
         return out;
       }
+      // 테스트 재생 — 폼의 현재(미저장) 말투/목소리 그대로
+      $("#test").addEventListener("click", () => {
+        window.settingsAPI.test({ tone: tone.value, voice: voice.value });
+      });
 
       (async () => {
         try { fill(await window.settingsAPI.get()); } catch (e) {}

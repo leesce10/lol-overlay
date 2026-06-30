@@ -22,6 +22,7 @@ const SETTINGS_DEFAULT = {
   volume: 0.8,
   muted: false,
   tone: "banmal", // 음성 말투: "banmal"(친근한 반말, 기본) | "jondaetmal"(존댓말)
+  voice: "female", // 목소리: "female"(여성, 기본) | "male"(남성)
 };
 let settings = { ...SETTINGS_DEFAULT };
 function settingsPath() {
@@ -127,7 +128,7 @@ function openSettings() {
   }
   settingsWin = new BrowserWindow({
     width: 460,
-    height: 530,
+    height: 580,
     title: "LoL Overlay 설정",
     resizable: false,
     minimizable: false,
@@ -146,6 +147,11 @@ function openSettings() {
 
 ipcMain.handle("get-settings", () => settings);
 ipcMain.on("save-settings", (_e, s) => saveSettings(s));
+// 설정 창 "테스트 재생" → 엔진이 폼의 현재 말투/목소리로 샘플 재생
+ipcMain.on("test-voice", (_e, cfg) => {
+  if (engineReady && engineWin && !engineWin.isDestroyed())
+    engineWin.webContents.send("test-voice", cfg);
+});
 
 // 게임 해상도(주 모니터) 기준 배치 — Overwolf 버전 좌표 그대로
 function positionWindows() {

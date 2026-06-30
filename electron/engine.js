@@ -23,6 +23,7 @@ let settings = {
   volume: 0.8,
   muted: false,
   tone: "banmal", // 음성 말투: "banmal"(친근한 반말, 기본) | "jondaetmal"(존댓말)
+  voice: "female", // 목소리: "female"(여성, 기본) | "male"(남성)
 };
 const voiceOn = (feat) => !settings.muted && settings[feat] && settings[feat].voice !== false;
 const overlayOn = (feat) => settings[feat] && settings[feat].overlay !== false;
@@ -642,14 +643,19 @@ function maybeBriefing(players) {
 }
 
 // engine(숨은 렌더러)에서 TTS 직접 재생 → 창·클릭 불필요
-// category: 기능별 음성 on/off 게이트("briefing"/"itemAlert"/"respawn"/"objective")
 let briefingAudio = null;
-function playTts(text, category) {
-  if (category && !voiceOn(category)) return; // 해당 기능 음성 꺼짐 / 음소거
+// 저수준 재생: 말투/목소리를 직접 받아 합성·재생(게이트 없음).
+// tone: "banmal"|"jondaetmal", voice: "female"|"male"
+function speak(text, { voice, tone } = {}) {
   if (!text) return;
-  if (settings.tone !== "jondaetmal") text = toBanmal(text); // 기본: 친근한 반말
+  if ((tone ?? settings.tone) !== "jondaetmal") text = toBanmal(text); // 기본: 친근한 반말
+  const v = voice ?? settings.voice ?? "female";
   const url =
-    API_BASE + "/api/live/tts?voice=female&text=" + encodeURIComponent(text);
+    API_BASE +
+    "/api/live/tts?voice=" +
+    encodeURIComponent(v) +
+    "&text=" +
+    encodeURIComponent(text);
   try {
     if (!briefingAudio) briefingAudio = new Audio();
     briefingAudio.src = url;
@@ -658,6 +664,20 @@ function playTts(text, category) {
   } catch (e) {
     log("TTS 오류:", e);
   }
+}
+
+// category: 기능별 음성 on/off 게이트("briefing"/"itemAlert"/"respawn"/"objective")
+function playTts(text, category) {
+  if (category && !voiceOn(category)) return; // 해당 기능 음성 꺼짐 / 음소거
+  speak(text, { voice: settings.voice, tone: settings.tone });
+}
+
+// 설정 창의 "테스트 재생" — 폼의 현재(미저장) 말투/목소리로 샘플 재생(게이트 무시)
+function playTestVoice(cfg) {
+  cfg = cfg || {};
+  const sample =
+    "상대 정글러가 위쪽에서 내려오고 있어요. 지금 라인을 빼고 갱킹을 조심하세요.";
+  speak(sample, { voice: cfg.voice || "female", tone: cfg.tone || "banmal" });
 }
 
 // ---- 적 아이템 구매 감지 --------------------------------------------------
@@ -814,4 +834,5 @@ engineAPI.onSettings((s) => {
   if (s) settings = { ...settings, ...s };
   log("설정 갱신:", JSON.stringify(settings));
 });
+engineAPI.onTestVoice((cfg) => playTestVoice(cfg));
 engineAPI.onGameEnd(() => resetState());
